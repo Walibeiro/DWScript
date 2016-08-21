@@ -89,18 +89,33 @@ type
    end;
 
    // list of unit main symbols (one per prog)
-   TUnitMainSymbols = class(TObjectList<TUnitMainSymbol>)
+   TUnitMainSymbols = class
       private
+         type
+            TArrayOfUnitMainSymbol = array of TUnitMainSymbol;
+         var
+            FItems : TArrayOfUnitMainSymbol;
+            FCount : Integer;
 
       protected
+         function GetItem(index : Integer) : TUnitMainSymbol; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItem(index : Integer; const item : TUnitMainSymbol);
 
       public
+         destructor Destroy; override;
+         function Add(const anItem : TUnitMainSymbol) : Integer;
+         function IndexOf(const anItem : TUnitMainSymbol) : Integer;
+         function Extract(idx : Integer) : TUnitMainSymbol;
+         procedure ExtractAll;
+         procedure Clear;
          procedure Initialize(const msgs : TdwsCompileMessageList);
 
          function Find(const unitName : UnicodeString) : TUnitMainSymbol;
 
          procedure CollectPublishedSymbols(symbolList : TSimpleSymbolList;
                                            ignoreImplementationPublished : Boolean);
+         property Items[index : Integer] : TUnitMainSymbol read GetItem write SetItem; default;
+         property Count : Integer read FCount;
    end;
 
    // TUnitSymbolTable
@@ -175,7 +190,28 @@ type
          function ImplementationTable : TUnitImplementationTable; inline;
    end;
 
-   TUnitSymbolList = class(TObjectList<TUnitSymbol>);
+   TUnitSymbolList = class
+      private
+         type
+            TArrayOfUnitSymbol = array of TUnitSymbol;
+         var
+            FItems : TArrayOfUnitSymbol;
+            FCount : Integer;
+
+      protected
+         function GetItem(index : Integer) : TUnitSymbol; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItem(index : Integer; const item : TUnitSymbol);
+
+      public
+         destructor Destroy; override;
+         function Add(const anItem : TUnitSymbol) : Integer;
+         function IndexOf(const anItem : TUnitSymbol) : Integer;
+         function Extract(idx : Integer) : TUnitSymbol;
+         procedure ExtractAll;
+         procedure Clear;
+         property Items[index : Integer] : TUnitSymbol read GetItem write SetItem; default;
+         property Count : Integer read FCount;
+   end;
    TUnitSymbolRefList = class(TUnitSymbolList)
       public
          destructor Destroy; override;
@@ -652,6 +688,84 @@ end;
 // ------------------ TUnitMainSymbols ------------------
 // ------------------
 
+// Destroy
+//
+destructor TUnitMainSymbols.Destroy;
+begin
+   Clear;
+   inherited;
+end;
+
+// GetItem
+//
+function TUnitMainSymbols.GetItem(index : Integer) : TUnitMainSymbol;
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   Result:=FItems[index];
+end;
+
+// SetItem
+//
+procedure TUnitMainSymbols.SetItem(index : Integer; const item : TUnitMainSymbol);
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   FItems[index]:=item;
+end;
+
+// Add
+//
+function TUnitMainSymbols.Add(const anItem : TUnitMainSymbol) : Integer;
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   FItems[FCount]:=anItem;
+   Result:=FCount;
+   Inc(FCount);
+end;
+
+// IndexOf
+//
+function TUnitMainSymbols.IndexOf(const anItem : TUnitMainSymbol) : Integer;
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if FItems[i]=anItem then Exit(i);
+   Result:=-1;
+end;
+
+// Extract
+//
+function TUnitMainSymbols.Extract(idx : Integer) : TUnitMainSymbol;
+var
+   n : Integer;
+begin
+   Assert(Cardinal(idx)<Cardinal(FCount), 'Index out of range');
+   n:=Count-1-idx;
+   Dec(FCount);
+   if n>0 then
+      System.Move(FItems[idx+1], FItems[idx], SizeOf(TUnitMainSymbol)*n);
+   Result:=FItems[idx];
+end;
+
+// ExtractAll
+//
+procedure TUnitMainSymbols.ExtractAll;
+begin
+   FCount:=0;
+end;
+
+// Clear
+//
+procedure TUnitMainSymbols.Clear;
+var
+   i : Integer;
+begin
+   for i:=FCount-1 downto 0 do
+      FItems[i].Free;
+   FCount:=0;
+end;
+
 // Find
 //
 function TUnitMainSymbols.Find(const unitName : UnicodeString) : TUnitMainSymbol;
@@ -909,6 +1023,89 @@ procedure TProgramSymbolTable.RemoveFromDestructionList(sym : TSymbol);
 begin
    FDestructionList.Remove(sym);
 end;
+
+// ------------------
+// ------------------ TUnitSymbolList ------------------
+// ------------------
+
+// Destroy
+//
+destructor TUnitSymbolList.Destroy;
+begin
+   Clear;
+   inherited;
+end;
+
+// GetItem
+//
+function TUnitSymbolList.GetItem(index : Integer) : TUnitSymbol;
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   Result:=FItems[index];
+end;
+
+// SetItem
+//
+procedure TUnitSymbolList.SetItem(index : Integer; const item : TUnitSymbol);
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   FItems[index]:=item;
+end;
+
+// Add
+//
+function TUnitSymbolList.Add(const anItem : TUnitSymbol) : Integer;
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   FItems[FCount]:=anItem;
+   Result:=FCount;
+   Inc(FCount);
+end;
+
+// IndexOf
+//
+function TUnitSymbolList.IndexOf(const anItem : TUnitSymbol) : Integer;
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if FItems[i]=anItem then Exit(i);
+   Result:=-1;
+end;
+
+// Extract
+//
+function TUnitSymbolList.Extract(idx : Integer) : TUnitSymbol;
+var
+   n : Integer;
+begin
+   Assert(Cardinal(idx)<Cardinal(FCount), 'Index out of range');
+   n:=Count-1-idx;
+   Dec(FCount);
+   if n>0 then
+      System.Move(FItems[idx+1], FItems[idx], SizeOf(TUnitSymbol)*n);
+   Result:=FItems[idx];
+end;
+
+// ExtractAll
+//
+procedure TUnitSymbolList.ExtractAll;
+begin
+   FCount:=0;
+end;
+
+// Clear
+//
+procedure TUnitSymbolList.Clear;
+var
+   i : Integer;
+begin
+   for i:=FCount-1 downto 0 do
+      FItems[i].Free;
+   FCount:=0;
+end;
+
 
 // ------------------
 // ------------------ TUnitNamespaceSymbol ------------------

@@ -268,11 +268,32 @@ type
          function GetEnumerator : TElementEnumerator;
    end;
 
+   TSimpleCallbackJSONValue = function (var item : TdwsJSONValue) : TSimpleCallbackStatus;
+
    // does not own its elements
-   TdwsJSONValueList = class(TSimpleList<TdwsJSONValue>)
+   TdwsJSONValueList = class
+      private
+         type
+            TArrayOfJSONValue = array of TdwsJSONValue;
+         var
+            FItems : TArrayOfJSONValue;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : TdwsJSONValue; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : TdwsJSONValue);
+
       public
+         procedure Add(const item : TdwsJSONValue);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackJSONValue);
          procedure WriteTo(writer : TdwsJSONWriter);
          function ToString : String; override;
+         property Items[const position : Integer] : TdwsJSONValue read GetItems write SetItems; default;
+         property Count : Integer read FCount;
    end;
 
    TdwsJSONPair = record
@@ -2931,6 +2952,74 @@ end;
 // ------------------
 // ------------------ TdwsJSONValueList ------------------
 // ------------------
+
+// Add
+//
+procedure TdwsJSONValueList.Add(const item: TdwsJSONValue);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Clear
+//
+procedure TdwsJSONValueList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TdwsJSONValueList.Enumerate(
+  const callback: TSimpleCallbackJSONValue);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Extract
+//
+procedure TdwsJSONValueList.Extract(idx: Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(TdwsJSONValue);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(TdwsJSONValue));
+      FillChar(FItems[FCount-1], SizeOf(TdwsJSONValue), 0);
+   end;
+   Dec(FCount);
+end;
+
+// GetItems
+//
+function TdwsJSONValueList.GetItems(const idx: Integer): TdwsJSONValue;
+begin
+   Result:=FItems[idx];
+end;
+
+// Grow
+//
+procedure TdwsJSONValueList.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// SetItems
+//
+procedure TdwsJSONValueList.SetItems(const idx: Integer;
+  const value: TdwsJSONValue);
+begin
+   FItems[idx]:=value;
+end;
 
 // ToString
 //

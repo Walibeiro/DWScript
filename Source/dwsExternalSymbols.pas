@@ -55,19 +55,144 @@ implementation
 // ------------------------------------------------------------------
 
 type
+   TSimpleCallbackIExternalSymbolHandler = function (var item : IExternalSymbolHandler) : TSimpleCallbackStatus;
+
+   // TSimpleListIExternalSymbolHandler
+   //
+   TSimpleListIExternalSymbolHandler = class
+      private
+         type
+            ArrayT = array of IExternalSymbolHandler;
+         var
+            FItems : ArrayT;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : IExternalSymbolHandler; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : IExternalSymbolHandler);
+
+      public
+         procedure Add(const item : IExternalSymbolHandler);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackIExternalSymbolHandler);
+         property Items[const position : Integer] : IExternalSymbolHandler read GetItems write SetItems; default;
+         property Count : Integer read FCount;
+   end;
+
    TSymbolHandlers = class (TRefCountedObject)
       FSymbol : TSymbol;
-      FHandlers : TSimpleList<IExternalSymbolHandler>;
+      FHandlers : TSimpleListIExternalSymbolHandler;
       destructor Destroy; override;
    end;
-   TSymbolHandlersList = class (TSortedList<TSymbolHandlers>)
-      function Compare(const item1, item2 : TSymbolHandlers) : Integer; override;
-      function Find(symbol : TSymbol) : TSymbolHandlers;
+
+   TSimpleCallbackSymbolHandlers = function (var item : TSymbolHandlers) : TSimpleCallbackStatus;
+
+   // TSymbolHandlersList
+   //
+   TSymbolHandlersList = class
+      private
+         type
+            TArrayOfSymbolHandlers = array of TSymbolHandlers;
+         var
+            FItems : TArrayOfSymbolHandlers;
+            FCount : Integer;
+
+      protected
+         function GetItem(index : Integer) : TSymbolHandlers;
+         function Find(const item : TSymbolHandlers; var index : Integer) : Boolean; overload;
+         function Find(symbol : TSymbol) : TSymbolHandlers; overload;
+         function Compare(const item1, item2 : TSymbolHandlers) : Integer;
+         procedure InsertItem(index : Integer; const anItem : TSymbolHandlers);
+
+      public
+         function Add(const anItem : TSymbolHandlers) : Integer;
+         function AddOrFind(const anItem : TSymbolHandlers; var added : Boolean) : Integer;
+         function Extract(const anItem : TSymbolHandlers) : Integer;
+         function ExtractAt(index : Integer) : TSymbolHandlers;
+         function IndexOf(const anItem : TSymbolHandlers) : Integer;
+         procedure Clear;
+         procedure Clean;
+         procedure Enumerate(const callback : TSimpleCallbackSymbolHandlers);
+         property Items[index : Integer] : TSymbolHandlers read GetItem; default;
+         property Count : Integer read FCount;
    end;
 
 var
    vSearch : TSymbolHandlers;
    vRegisteredHandlers : TSymbolHandlersList;
+
+// ------------------
+// ------------------ TSimpleListIExternalSymbolHandler ------------------
+// ------------------
+
+// Add
+//
+procedure TSimpleListIExternalSymbolHandler.Add(const item : IExternalSymbolHandler);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Extract
+//
+procedure TSimpleListIExternalSymbolHandler.Extract(idx : Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(IExternalSymbolHandler);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(IExternalSymbolHandler));
+      FillChar(FItems[FCount-1], SizeOf(IExternalSymbolHandler), 0);
+   end;
+   Dec(FCount);
+end;
+
+// Clear
+//
+procedure TSimpleListIExternalSymbolHandler.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TSimpleListIExternalSymbolHandler.Enumerate(const callback : TSimpleCallbackIExternalSymbolHandler);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Grow
+//
+procedure TSimpleListIExternalSymbolHandler.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// GetItems
+//
+function TSimpleListIExternalSymbolHandler.GetItems(const idx : Integer) : IExternalSymbolHandler;
+begin
+   Result:=FItems[idx];
+end;
+
+// SetItems
+//
+procedure TSimpleListIExternalSymbolHandler.SetItems(const idx : Integer; const value : IExternalSymbolHandler);
+begin
+   FItems[idx]:=value;
+end;
 
 // ------------------
 // ------------------ TSymbolHandlers ------------------
@@ -151,7 +276,7 @@ begin
       h:=vRegisteredHandlers[i];
    end else begin
       vRegisteredHandlers.Add(h);
-      h.FHandlers:=TSimpleList<IExternalSymbolHandler>.Create;
+      h.FHandlers:=TSimpleListIExternalSymbolHandler.Create;
    end;
    h.FHandlers.Add(handler);
 end;
@@ -190,6 +315,130 @@ begin
    end else begin
       handled:=False;
    end;
+end;
+
+// ------------------
+// ------------------ TSymbolHandlersList ------------------
+// ------------------
+
+// GetItem
+//
+function TSymbolHandlersList.GetItem(index : Integer) : TSymbolHandlers;
+begin
+   Result:=FItems[index];
+end;
+
+// Find
+//
+function TSymbolHandlersList.Find(const item : TSymbolHandlers; var index : Integer) : Boolean;
+var
+   lo, hi, mid, compResult : Integer;
+begin
+   Result:=False;
+   lo:=0;
+   hi:=FCount-1;
+   while lo<=hi do begin
+      mid:=(lo+hi) shr 1;
+      compResult:=Compare(FItems[mid], item);
+      if compResult<0 then
+         lo:=mid+1
+      else begin
+         hi:=mid- 1;
+         if compResult=0 then
+            Result:=True;
+      end;
+   end;
+   index:=lo;
+end;
+
+// InsertItem
+//
+procedure TSymbolHandlersList.InsertItem(index : Integer; const anItem : TSymbolHandlers);
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   if index<Count then
+      System.Move(FItems[index], FItems[index+1], (Count-index)*SizeOf(Pointer));
+   Inc(FCount);
+   FItems[index]:=anItem;
+end;
+
+// Add
+//
+function TSymbolHandlersList.Add(const anItem : TSymbolHandlers) : Integer;
+begin
+   Find(anItem, Result);
+   InsertItem(Result, anItem);
+end;
+
+// AddOrFind
+//
+function TSymbolHandlersList.AddOrFind(const anItem : TSymbolHandlers; var added : Boolean) : Integer;
+begin
+   added:=not Find(anItem, Result);
+   if added then
+      InsertItem(Result, anItem);
+end;
+
+// Extract
+//
+function TSymbolHandlersList.Extract(const anItem : TSymbolHandlers) : Integer;
+begin
+   if Find(anItem, Result) then
+      ExtractAt(Result)
+   else Result:=-1;
+end;
+
+// ExtractAt
+//
+function TSymbolHandlersList.ExtractAt(index : Integer) : TSymbolHandlers;
+var
+   n : Integer;
+begin
+   Dec(FCount);
+   Result:=FItems[index];
+   n:=FCount-index;
+   if n>0 then
+      System.Move(FItems[index+1], FItems[index], n*SizeOf(TSymbolHandlers));
+   SetLength(FItems, FCount);
+end;
+
+// IndexOf
+//
+function TSymbolHandlersList.IndexOf(const anItem : TSymbolHandlers) : Integer;
+begin
+   if not Find(anItem, Result) then
+      Result:=-1;
+end;
+
+// Clear
+//
+procedure TSymbolHandlersList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+end;
+
+// Clean
+//
+procedure TSymbolHandlersList.Clean;
+var
+   i : Integer;
+begin
+   for i:=0 to FCount-1 do
+      FItems[i].Free;
+   Clear;
+end;
+
+// Enumerate
+//
+procedure TSymbolHandlersList.Enumerate(const callback : TSimpleCallbackSymbolHandlers);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callback(FItems[i])=csAbort then
+         Break;
 end;
 
 // ------------------------------------------------------------------

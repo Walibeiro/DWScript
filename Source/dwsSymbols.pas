@@ -308,7 +308,32 @@ type
                        stfHasLocalOperators, stfHasParentOperators, stfHasOperators);
    TSymbolTableFlags = set of TSymbolTableFlag;
 
-   TSimpleSymbolList = TSimpleList<TSymbol>;
+   TSimpleCallbackSymbol = function (var item : TSymbol) : TSimpleCallbackStatus;
+
+   // TSimpleSymbolList
+   //
+   TSimpleSymbolList = class
+      private
+         type
+            TArrayOfSymbol = array of TSymbol;
+         var
+            FItems : TArrayOfSymbol;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : TSymbol; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : TSymbol);
+
+      public
+         procedure Add(const item : TSymbol);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackSymbol);
+         property Items[const position : Integer] : TSymbol read GetItems write SetItems; default;
+         property Count : Integer read FCount;
+   end;
 
    // A table of symbols connected to other symboltables (property Parents)
    TSymbolTable = class (TRefCountedObject)
@@ -399,6 +424,32 @@ type
          function GetEnumerator : TSymbolTableEnumerator;
    end;
 
+   TSimpleSymbolTableHash = class
+      private
+         FBuckets : array of TSimpleHashBucket<TSymbolTable>;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function LinearFind(const item : TSymbolTable; var index : Integer) : Boolean;
+         function SameItem(const item1, item2 : TSymbolTable) : Boolean;
+         function GetItemHashCode(const item1 : TSymbolTable) : Integer;
+
+      public
+         function Add(const anItem : TSymbolTable) : Boolean; // true if added
+         function Replace(const anItem : TSymbolTable) : Boolean; // true if added
+         function Remove(const anItem : TSymbolTable) : Boolean; // true if removed
+         function Contains(const anItem : TSymbolTable) : Boolean;
+         function Match(var anItem : TSymbolTable) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashFunc<TSymbolTable>);
+         procedure Clear;
+         procedure Clean;
+
+         property Count : Integer read FCount;
+   end;
+
    TSymbolTableClass = class of TSymbolTable;
 
    // TUnSortedSymbolTable
@@ -444,9 +495,32 @@ type
          property Index : Integer read FIndex write FIndex;
    end;
 
-   TResourceStringSymbolList = class(TSimpleList<TResourceStringSymbol>)
+   TSimpleCallbackResourceStringSymbol = function (var item : TResourceStringSymbol) : TSimpleCallbackStatus;
+
+   // TSimpleSymbolList
+   //
+   TResourceStringSymbolList = class
+      private
+         type
+            TArrayOfSymbol = array of TResourceStringSymbol;
+         var
+            FItems : TArrayOfSymbol;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : TResourceStringSymbol; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : TResourceStringSymbol);
+
       public
+         procedure Add(const item : TResourceStringSymbol);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackResourceStringSymbol);
          procedure ComputeIndexes;
+         property Items[const position : Integer] : TResourceStringSymbol read GetItems write SetItems; default;
+         property Count : Integer read FCount;
    end;
 
    // All Symbols containing a value
@@ -762,10 +836,31 @@ type
          property SourcePosition : TScriptPos read GetSourcePosition write SetSourcePosition;
    end;
 
+   TSimpleCallbackFuncSymbol = function (var item : TFuncSymbol) : TSimpleCallbackStatus;
+
    // referring list of function symbols
-   TFuncSymbolList = class(TSimpleList<TFuncSymbol>)
+   TFuncSymbolList = class
+      private
+         type
+            TArrayOfFuncSymbol = array of TFuncSymbol;
+         var
+            FItems : TArrayOfFuncSymbol;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : TFuncSymbol; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : TFuncSymbol);
+
       public
+         procedure Add(const item : TFuncSymbol);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackFuncSymbol);
          function ContainsChildMethodOf(methSym : TMethodSymbol) : Boolean;
+         property Items[const position : Integer] : TFuncSymbol read GetItems write SetItems; default;
+         property Count : Integer read FCount;
    end;
 
    TAnyFuncSymbol = class(TFuncSymbol)
@@ -1459,10 +1554,29 @@ type
       VMT : TMethodSymbolArray;
    end;
 
-   TResolvedInterfaces = class (TSimpleHash<TResolvedInterface>)
+   TResolvedInterfaces = class
+      private
+         FBuckets : array of TSimpleHashBucket<TResolvedInterface>;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
       protected
-         function SameItem(const item1, item2 : TResolvedInterface) : Boolean; override;
-         function GetItemHashCode(const item1 : TResolvedInterface) : Integer; override;
+         procedure Grow;
+         function LinearFind(const item : TResolvedInterface; var index : Integer) : Boolean;
+         function SameItem(const item1, item2 : TResolvedInterface) : Boolean;
+         function GetItemHashCode(const item1 : TResolvedInterface) : Integer;
+
+      public
+         function Add(const anItem : TResolvedInterface) : Boolean; // true if added
+         function Replace(const anItem : TResolvedInterface) : Boolean; // true if added
+         function Remove(const anItem : TResolvedInterface) : Boolean; // true if removed
+         function Contains(const anItem : TResolvedInterface) : Boolean;
+         function Match(var anItem : TResolvedInterface) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashFunc<TResolvedInterface>);
+         procedure Clear;
+
+         property Count : Integer read FCount;
    end;
 
    TObjectDestroyEvent = procedure (ExternalObject: TObject) of object;
@@ -1600,9 +1714,30 @@ type
          property Strict : Boolean read FStrict write FStrict;
    end;
 
-   THelperSymbols = class(TSimpleList<THelperSymbol>)
+   TSimpleCallbackHelperSymbol = function (var item : THelperSymbol) : TSimpleCallbackStatus;
+
+   THelperSymbols = class
+      private
+         type
+            TArrayOfHelperSymbol = array of THelperSymbol;
+         var
+            FItems : TArrayOfHelperSymbol;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : THelperSymbol; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : THelperSymbol);
+
       public
+         procedure Add(const item : THelperSymbol);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackHelperSymbol);
          function AddHelper(helper : THelperSymbol) : Boolean;
+         property Items[const position : Integer] : THelperSymbol read GetItems write SetItems; default;
+         property Count : Integer read FCount;
    end;
 
    // nil "class"
@@ -1694,6 +1829,28 @@ type
          property WriteFunc : TFuncSymbol read GetWriteFunc write FWriteFunc;
    end;
 
+   TSimpleStackIScriptObj = class
+      type
+        TArrayOfIScriptObj = array of IScriptObj;
+      private
+         FItems : TArrayOfIScriptObj;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : IScriptObj; inline;
+         procedure SetPeek(const item : IScriptObj);
+         function GetItems(const position : Integer) : IScriptObj;
+         procedure SetItems(const position : Integer; const value : IScriptObj);
+      public
+         procedure Push(const item : IScriptObj);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : IScriptObj read GetPeek write SetPeek;
+         property Items[const position : Integer] : IScriptObj read GetItems write SetItems;
+         property Count : Integer read FCount;
+   end;
+
    // TdwsExecution
    //
    TdwsExecution = class abstract (TInterfacedSelfObject, IdwsExecution)
@@ -1717,7 +1874,7 @@ type
          FExternalObject : TObject;
          FUserObject : TObject;
 
-         FExceptionObjectStack : TSimpleStack<IScriptObj>;
+         FExceptionObjectStack : TSimpleStackIScriptObj;
          FLastScriptError : TExprBase;
          FLastScriptCallStack : TdwsExprLocationArray;
 
@@ -1788,7 +1945,7 @@ type
 
          property LastScriptError : TExprBase read FLastScriptError;
          property LastScriptCallStack : TdwsExprLocationArray read FLastScriptCallStack;
-         property ExceptionObjectStack : TSimpleStack<IScriptObj> read FExceptionObjectStack;
+         property ExceptionObjectStack : TSimpleStackIScriptObj read FExceptionObjectStack;
 
          procedure EnterExceptionBlock(var exceptObj : IScriptObj); virtual;
          procedure LeaveExceptionBlock;
@@ -5350,7 +5507,79 @@ begin
    Result:=TVarParamSymbol.Create(Name, Typ);
 end;
 
-{ TSymbolTable }
+// ------------------
+// ------------------ TSimpleSymbolList ------------------
+// ------------------
+
+// Add
+//
+procedure TSimpleSymbolList.Add(const item : TSymbol);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Extract
+//
+procedure TSimpleSymbolList.Extract(idx : Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(TSymbol);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(TSymbol));
+      FillChar(FItems[FCount-1], SizeOf(TSymbol), 0);
+   end;
+   Dec(FCount);
+end;
+
+// Clear
+//
+procedure TSimpleSymbolList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TSimpleSymbolList.Enumerate(const callback : TSimpleCallbackSymbol);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Grow
+//
+procedure TSimpleSymbolList.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// GetItems
+//
+function TSimpleSymbolList.GetItems(const idx : Integer) : TSymbol;
+begin
+   Result:=FItems[idx];
+end;
+
+// SetItems
+//
+procedure TSimpleSymbolList.SetItems(const idx : Integer; const value : TSymbol);
+begin
+   FItems[idx]:=value;
+end;
+
+// ------------------
+// ------------------ TSymbolTable ------------------
+// ------------------
 
 constructor TSymbolTable.Create(Parent: TSymbolTable; AddrGenerator: TAddrGenerator);
 begin
@@ -5366,6 +5595,8 @@ begin
    inherited;
 end;
 
+// Initialize
+//
 procedure TSymbolTable.Initialize(const msgs : TdwsCompileMessageList);
 var
    i : Integer;
@@ -5555,11 +5786,11 @@ function TSymbolTable.EnumerateSymbolsOfNameInScope(const aName : UnicodeString;
                         const callback : TSymbolEnumerationCallback) : Boolean;
 var
    i : Integer;
-   visitedTables : TSimpleObjectHash<TSymbolTable>;
+   visitedTables : TSimpleSymbolTableHash;
    tableStack : TSimpleStack<TSymbolTable>;
    current : TSymbolTable;
 begin
-   visitedTables:=TSimpleObjectHash<TSymbolTable>.Create;
+   visitedTables:=TSimpleSymbolTableHash.Create;
    tableStack:=TSimpleStack<TSymbolTable>.Create;
    try
       tableStack.Push(Self);
@@ -5942,6 +6173,194 @@ begin
 end;
 
 // ------------------
+// ------------------ TSimpleSymbolTableHash ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleSymbolTableHash.Grow;
+var
+   i, j, n : Integer;
+   hashCode : Integer;
+   oldBuckets : array of TSimpleHashBucket<TSymbolTable>;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TSimpleSymbolTableHash.LinearFind(const item : TSymbolTable; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TSimpleSymbolTableHash.Add(const anItem : TSymbolTable) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TSimpleSymbolTableHash.Replace(const anItem : TSymbolTable) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TSimpleSymbolTableHash.Remove(const anItem : TSymbolTable) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TSymbolTable);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TSimpleSymbolTableHash.Contains(const anItem : TSymbolTable) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TSimpleSymbolTableHash.Match(var anItem : TSymbolTable) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TSimpleSymbolTableHash.Enumerate(callBack : TSimpleHashFunc<TSymbolTable>);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TSymbolTable);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TSimpleSymbolTableHash.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
+
+// SameItem
+//
+function TSimpleSymbolTableHash.SameItem(const item1, item2 : TSymbolTable) : Boolean;
+begin
+   Result:=(item1=item2);
+end;
+
+// GetItemHashCode
+//
+function TSimpleSymbolTableHash.GetItemHashCode(const item1 : TSymbolTable) : Integer;
+var
+   p : NativeInt;
+begin
+   p:=PNativeInt(@item1)^; // workaround compiler issue
+   Result:=(p shr 4)+1;
+end;
+
+// Clean
+//
+procedure TSimpleSymbolTableHash.Clean;
+var
+   i : Integer;
+begin
+   for i:=0 to FCapacity-1 do
+      if FBuckets[i].HashCode<>0 then
+         FBuckets[i].Value.Free;
+   Clear;
+end;
+
+// ------------------
 // ------------------ TMembersSymbolTable ------------------
 // ------------------
 
@@ -6054,6 +6473,71 @@ end;
 function TExternalVarSymbol.GetWriteFunc: TFuncSymbol;
 begin
   Result := FWriteFunc;
+end;
+
+// ------------------
+// ------------------ TSimpleStackIScriptObj ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackIScriptObj.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackIScriptObj.Push(const item : IScriptObj);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackIScriptObj.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackIScriptObj.GetPeek : IScriptObj;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackIScriptObj.SetPeek(const item : IScriptObj);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackIScriptObj.GetItems(const position : Integer) : IScriptObj;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackIScriptObj.SetItems(const position : Integer; const value : IScriptObj);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackIScriptObj.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
 end;
 
 // ------------------
@@ -6873,7 +7357,7 @@ begin
    inherited Create;
    FStack.Initialize(stackParams);
    FStack.Reset;
-   FExceptionObjectStack:=TSimpleStack<IScriptObj>.Create;
+   FExceptionObjectStack:=TSimpleStackIScriptObj.Create;
    FRandSeed:=cDefaultRandSeed xor (UInt64(System.Random($7FFFFFFF)) shl 15);
 end;
 
@@ -7280,6 +7764,161 @@ end;
 // ------------------ TResolvedInterfaces ------------------
 // ------------------
 
+// Grow
+//
+procedure TResolvedInterfaces.Grow;
+var
+   i, j, n : Integer;
+   hashCode : Integer;
+   oldBuckets : array of TSimpleHashBucket<TResolvedInterface>;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TResolvedInterfaces.LinearFind(const item : TResolvedInterface; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TResolvedInterfaces.Add(const anItem : TResolvedInterface) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TResolvedInterfaces.Replace(const anItem : TResolvedInterface) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TResolvedInterfaces.Remove(const anItem : TResolvedInterface) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TResolvedInterface);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TResolvedInterfaces.Contains(const anItem : TResolvedInterface) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TResolvedInterfaces.Match(var anItem : TResolvedInterface) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TResolvedInterfaces.Enumerate(callBack : TSimpleHashFunc<TResolvedInterface>);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TResolvedInterface);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TResolvedInterfaces.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
+
 // SameItem
 //
 function TResolvedInterfaces.SameItem(const item1, item2 : TResolvedInterface) : Boolean;
@@ -7338,6 +7977,72 @@ end;
 // ------------------ TResourceStringSymbolList ------------------
 // ------------------
 
+// Add
+//
+procedure TResourceStringSymbolList.Add(const item : TResourceStringSymbol);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Extract
+//
+procedure TResourceStringSymbolList.Extract(idx : Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(TResourceStringSymbol);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(TResourceStringSymbol));
+      FillChar(FItems[FCount-1], SizeOf(TResourceStringSymbol), 0);
+   end;
+   Dec(FCount);
+end;
+
+// Clear
+//
+procedure TResourceStringSymbolList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TResourceStringSymbolList.Enumerate(const callback : TSimpleCallbackResourceStringSymbol);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Grow
+//
+procedure TResourceStringSymbolList.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// GetItems
+//
+function TResourceStringSymbolList.GetItems(const idx : Integer) : TResourceStringSymbol;
+begin
+   Result:=FItems[idx];
+end;
+
+// SetItems
+//
+procedure TResourceStringSymbolList.SetItems(const idx : Integer; const value : TResourceStringSymbol);
+begin
+   FItems[idx]:=value;
+end;
+
 // ComputeIndexes
 //
 procedure TResourceStringSymbolList.ComputeIndexes;
@@ -7351,6 +8056,72 @@ end;
 // ------------------
 // ------------------ TFuncSymbolList ------------------
 // ------------------
+
+// Add
+//
+procedure TFuncSymbolList.Add(const item : TFuncSymbol);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Extract
+//
+procedure TFuncSymbolList.Extract(idx : Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(TFuncSymbol);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(TFuncSymbol));
+      FillChar(FItems[FCount-1], SizeOf(TFuncSymbol), 0);
+   end;
+   Dec(FCount);
+end;
+
+// Clear
+//
+procedure TFuncSymbolList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TFuncSymbolList.Enumerate(const callback : TSimpleCallbackFuncSymbol);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Grow
+//
+procedure TFuncSymbolList.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// GetItems
+//
+function TFuncSymbolList.GetItems(const idx : Integer) : TFuncSymbol;
+begin
+   Result:=FItems[idx];
+end;
+
+// SetItems
+//
+procedure TFuncSymbolList.SetItems(const idx : Integer; const value : TFuncSymbol);
+begin
+   FItems[idx]:=value;
+end;
 
 // ContainsChildMethodOf
 //
@@ -7481,6 +8252,72 @@ end;
 // ------------------
 // ------------------ THelperSymbols ------------------
 // ------------------
+
+// Add
+//
+procedure THelperSymbols.Add(const item : THelperSymbol);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Extract
+//
+procedure THelperSymbols.Extract(idx : Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(THelperSymbol);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(THelperSymbol));
+      FillChar(FItems[FCount-1], SizeOf(THelperSymbol), 0);
+   end;
+   Dec(FCount);
+end;
+
+// Clear
+//
+procedure THelperSymbols.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure THelperSymbols.Enumerate(const callback : TSimpleCallbackHelperSymbol);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Grow
+//
+procedure THelperSymbols.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// GetItems
+//
+function THelperSymbols.GetItems(const idx : Integer) : THelperSymbol;
+begin
+   Result:=FItems[idx];
+end;
+
+// SetItems
+//
+procedure THelperSymbols.SetItems(const idx : Integer; const value : THelperSymbol);
+begin
+   FItems[idx]:=value;
+end;
 
 // AddHelper
 //

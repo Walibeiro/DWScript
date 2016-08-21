@@ -177,9 +177,35 @@ type
 
    TTokenizer = class;
 
+   // TObjectList
+   //
+   {: A simple generic object list, owns objects }
+   TObjectListState = class
+      private
+         type
+            TArrayOfState = array of TState;
+         var
+            FItems : TArrayOfState;
+            FCount : Integer;
+
+      protected
+         function GetItem(index : Integer) : TState; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItem(index : Integer; const item : TState);
+
+      public
+         destructor Destroy; override;
+         function Add(const anItem : TState) : Integer;
+         function IndexOf(const anItem : TState) : Integer;
+         function Extract(idx : Integer) : TState;
+         procedure ExtractAll;
+         procedure Clear;
+         property Items[index : Integer] : TState read GetItem write SetItem; default;
+         property Count : Integer read FCount;
+   end;
+
    TTokenizerRules = class
       private
-         FStates : TObjectList<TState>;
+         FStates : TObjectListState;
          FEOFTransition : TErrorTransition;
          FReservedNames : TTokenTypes;
          FSymbolTokens : TTokenTypes;
@@ -1664,6 +1690,88 @@ begin
 end;
 
 // ------------------
+// ------------------ TObjectListState ------------------
+// ------------------
+
+// Destroy
+//
+destructor TObjectListState.Destroy;
+begin
+   Clear;
+   inherited;
+end;
+
+// GetItem
+//
+function TObjectListState.GetItem(index : Integer) : TState;
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   Result:=FItems[index];
+end;
+
+// SetItem
+//
+procedure TObjectListState.SetItem(index : Integer; const item : TState);
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   FItems[index]:=item;
+end;
+
+// Add
+//
+function TObjectListState.Add(const anItem : TState) : Integer;
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   FItems[FCount]:=anItem;
+   Result:=FCount;
+   Inc(FCount);
+end;
+
+// IndexOf
+//
+function TObjectListState.IndexOf(const anItem : TState) : Integer;
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if FItems[i]=anItem then Exit(i);
+   Result:=-1;
+end;
+
+// Extract
+//
+function TObjectListState.Extract(idx : Integer) : TState;
+var
+   n : Integer;
+begin
+   Assert(Cardinal(idx)<Cardinal(FCount), 'Index out of range');
+   n:=Count-1-idx;
+   Dec(FCount);
+   if n>0 then
+      System.Move(FItems[idx+1], FItems[idx], SizeOf(TState)*n);
+   Result:=FItems[idx];
+end;
+
+// ExtractAll
+//
+procedure TObjectListState.ExtractAll;
+begin
+   FCount:=0;
+end;
+
+// Clear
+//
+procedure TObjectListState.Clear;
+var
+   i : Integer;
+begin
+   for i:=FCount-1 downto 0 do
+      FItems[i].Free;
+   FCount:=0;
+end;
+
+// ------------------
 // ------------------ TTokenizerRules ------------------
 // ------------------
 
@@ -1671,7 +1779,7 @@ end;
 //
 constructor TTokenizerRules.Create;
 begin
-   FStates:=TObjectList<TState>.Create;
+   FStates:=TObjectListState.Create;
 end;
 
 // Destroy

@@ -71,7 +71,7 @@ type
          function Check(expr : TExprBase) : Boolean;
    end;
 
-   TStringToEnum = class (TCaseInsensitiveNameValueHash<Integer>)
+   TStringToEnum = class (TCaseInsensitiveNameValueHashInteger)
       public
          constructor Create(typ : PTypeInfo; low, high, prefixLength : Integer);
    end;
@@ -104,14 +104,15 @@ implementation
 // ------------------------------------------------------------------
 // ------------------------------------------------------------------
 
-// NameToArrayMethod
-//
 var
    vArrayMethodsHash : TStringToEnum;
+
+// NameToArrayMethod
+//
 function NameToArrayMethod(const name : String; msgs : TdwsCompileMessageList;
                            const namePos : TScriptPos) : TArrayMethodKind;
 var
-   bucket : TNameValueHashBucket<Integer>;
+   bucket : TNameValueHashBucketInteger;
 begin
    bucket.Name:=name;
    if vArrayMethodsHash.Match(bucket) then begin
@@ -525,7 +526,7 @@ end;
 constructor TStringToEnum.Create(typ : PTypeInfo; low, high, prefixLength : Integer);
 var
    i : Integer;
-   bucket : TNameValueHashBucket<Integer>;
+   bucket : TNameValueHashBucketInteger;
 begin
    for i:=low to high do begin
       bucket.Name:=Copy(GetEnumName(typ, i), prefixLength+1, 99);

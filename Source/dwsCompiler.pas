@@ -86,10 +86,31 @@ type
    TdwsNameListOption = (nloAllowDots, nloNoCheckSpecials, nloAllowStrings);
    TdwsNameListOptions = set of TdwsNameListOption;
 
-   TSimpleStringList = class(TSimpleList<UnicodeString>)
+   TSimpleCallbackString = function (var item : UnicodeString) : TSimpleCallbackStatus;
+
+   TSimpleStringList = class
+      private
+         type
+            ArrayUnicodeString = array of UnicodeString;
+         var
+            FItems : ArrayUnicodeString;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : UnicodeString; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : UnicodeString);
+
       public
          Next : TSimpleStringList;
+         procedure Add(const item : UnicodeString);
+         procedure Extract(idx : Integer);
+         procedure Clear;
          function IndexOf(const s : UnicodeString) : Integer;
+         procedure Enumerate(const callback : TSimpleCallbackString);
+         property Items[const position : Integer] : UnicodeString read GetItems write SetItems; default;
+         property Count : Integer read FCount;
    end;
 
    // TdwsLocalizerComponent
@@ -355,7 +376,26 @@ type
       function Attributes : TdwsSymbolAttributes;
    end;
 
-   TdwsCompilerUnitContextStack = class(TSimpleStack<TdwsCompilerUnitContext>)
+   TdwsCompilerUnitContextStack = class
+      type
+        TArrayOfCompilerUnitContext = array of TdwsCompilerUnitContext;
+      private
+         FItems : TArrayOfCompilerUnitContext;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : TdwsCompilerUnitContext; inline;
+         procedure SetPeek(const item : TdwsCompilerUnitContext);
+         function GetItems(const position : Integer) : TdwsCompilerUnitContext;
+         procedure SetItems(const position : Integer; const value : TdwsCompilerUnitContext);
+      public
+         procedure Push(const item : TdwsCompilerUnitContext);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : TdwsCompilerUnitContext read GetPeek write SetPeek;
+         property Items[const position : Integer] : TdwsCompilerUnitContext read GetItems write SetItems;
+         property Count : Integer read FCount;
       public
          destructor Destroy; override;
          procedure Clean;
@@ -420,6 +460,50 @@ type
       function ReadExpr(expecting : TTypeSymbol = nil) : TTypedExpr;
    end;
 
+   TSimpleStackProgramExpr = class
+      type
+         TArrayOfProgramExpr = array of TProgramExpr;
+      private
+         FItems : TArrayOfProgramExpr;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : TProgramExpr; inline;
+         procedure SetPeek(const item : TProgramExpr);
+         function GetItems(const position : Integer) : TProgramExpr;
+         procedure SetItems(const position : Integer; const value : TProgramExpr);
+      public
+         procedure Push(const item : TProgramExpr);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : TProgramExpr read GetPeek write SetPeek;
+         property Items[const position : Integer] : TProgramExpr read GetItems write SetItems;
+         property Count : Integer read FCount;
+   end;
+
+   TSimpleStackLoopExitable = class
+      type
+         TArrayOfLoopExitable = array of TLoopExitable;
+      private
+         FItems : TArrayOfLoopExitable;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : TLoopExitable; inline;
+         procedure SetPeek(const item : TLoopExitable);
+         function GetItems(const position : Integer) : TLoopExitable;
+         procedure SetItems(const position : Integer; const value : TLoopExitable);
+      public
+         procedure Push(const item : TLoopExitable);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : TLoopExitable read GetPeek write SetPeek;
+         property Items[const position : Integer] : TLoopExitable read GetItems write SetItems;
+         property Count : Integer read FCount;
+   end;
+
    // TdwsCompiler
    //
    TSimpleObjectObjectHash_TDataSymbol_TVarExpr = TSimpleObjectObjectHash<TDataSymbol,TVarExpr>;
@@ -433,9 +517,9 @@ type
          FSourceContextMap : TdwsSourceContextMap;
          FSymbolDictionary : TdwsSymbolDictionary;
          FOperators : TOperators;
-         FLoopExprs : TSimpleStack<TProgramExpr>;
-         FLoopExitable : TSimpleStack<TLoopExitable>;
-         FFinallyExprs : TSimpleStack<Boolean>;
+         FLoopExprs : TSimpleStackProgramExpr;
+         FLoopExitable : TSimpleStackLoopExitable;
+         FFinallyExprs : TSimpleStackBoolean;
          FMsgs : TdwsCompileMessageList;
          FDefaultHintsLevel : TdwsHintsLevel;
 
@@ -457,7 +541,7 @@ type
          FSourcePostConditionsIndex : Integer;
          FUnitSection : TdwsUnitSection;
          FUnitContextStack : TdwsCompilerUnitContextStack;
-         FUnitsFromStack : TSimpleStack<UnicodeString>;
+         FUnitsFromStack : TSimpleStackString;
          FCurrentSourceUnit : TSourceUnit;
          FCurrentUnitSymbol : TUnitMainSymbol;
          FCurrentStructure : TCompositeTypeSymbol;
@@ -1268,6 +1352,136 @@ begin
 end;
 
 // ------------------
+// ------------------ TSimpleStackProgramExpr ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackProgramExpr.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackProgramExpr.Push(const item : TProgramExpr);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackProgramExpr.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackProgramExpr.GetPeek : TProgramExpr;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackProgramExpr.SetPeek(const item : TProgramExpr);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackProgramExpr.GetItems(const position : Integer) : TProgramExpr;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackProgramExpr.SetItems(const position : Integer; const value : TProgramExpr);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackProgramExpr.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
+end;
+
+// ------------------
+// ------------------ TSimpleStackLoopExitable ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackLoopExitable.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackLoopExitable.Push(const item : TLoopExitable);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackLoopExitable.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackLoopExitable.GetPeek : TLoopExitable;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackLoopExitable.SetPeek(const item : TLoopExitable);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackLoopExitable.GetItems(const position : Integer) : TLoopExitable;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackLoopExitable.SetItems(const position : Integer; const value : TLoopExitable);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackLoopExitable.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
+end;
+
+// ------------------
 // ------------------ TdwsCompiler ------------------
 // ------------------
 
@@ -1283,10 +1497,10 @@ begin
 
    FTokRules:=TPascalTokenizerStateRules.Create;
 
-   FLoopExprs:=TSimpleStack<TProgramExpr>.Create;
-   FLoopExitable:=TSimpleStack<TLoopExitable>.Create;
-   FFinallyExprs:=TSimpleStack<Boolean>.Create;
-   FUnitsFromStack:=TSimpleStack<UnicodeString>.Create;
+   FLoopExprs:=TSimpleStackProgramExpr.Create;
+   FLoopExitable:=TSimpleStackLoopExitable.Create;
+   FFinallyExprs:=TSimpleStackBoolean.Create;
+   FUnitsFromStack:=TSimpleStackString.Create;
    FUnitContextStack:=TdwsCompilerUnitContextStack.Create;
    FAnyFuncSymbol:=TAnyFuncSymbol.Create('', fkFunction, 0);
 
@@ -14686,6 +14900,67 @@ end;
 // ------------------ TdwsCompilerUnitContextStack ------------------
 // ------------------
 
+// Grow
+//
+procedure TdwsCompilerUnitContextStack.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TdwsCompilerUnitContextStack.Push(const item : TdwsCompilerUnitContext);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TdwsCompilerUnitContextStack.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TdwsCompilerUnitContextStack.GetPeek : TdwsCompilerUnitContext;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TdwsCompilerUnitContextStack.SetPeek(const item : TdwsCompilerUnitContext);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TdwsCompilerUnitContextStack.GetItems(const position : Integer) : TdwsCompilerUnitContext;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TdwsCompilerUnitContextStack.SetItems(const position : Integer; const value : TdwsCompilerUnitContext);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TdwsCompilerUnitContextStack.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
+end;
+
 // Destroy
 //
 destructor TdwsCompilerUnitContextStack.Destroy;
@@ -14731,6 +15006,65 @@ end;
 // ------------------ TSimpleStringList ------------------
 // ------------------
 
+// Add
+//
+procedure TSimpleStringList.Add(const item: UnicodeString);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Clear
+//
+procedure TSimpleStringList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TSimpleStringList.Enumerate(const callback: TSimpleCallbackString);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Extract
+//
+procedure TSimpleStringList.Extract(idx: Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(UnicodeString);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(UnicodeString));
+      FillChar(FItems[FCount-1], SizeOf(UnicodeString), 0);
+   end;
+   Dec(FCount);
+end;
+
+// GetItems
+//
+function TSimpleStringList.GetItems(const idx: Integer): UnicodeString;
+begin
+   Result:=FItems[idx];
+end;
+
+// Grow
+//
+procedure TSimpleStringList.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
 // IndexOf
 //
 function TSimpleStringList.IndexOf(const s : UnicodeString) : Integer;
@@ -14740,12 +15074,19 @@ begin
    Result:=-1;
 end;
 
+
 { TTypeLookupData }
 
 constructor TTypeLookupData.Create(event: TTypeConvertEvent; info: PTypeInfo);
 begin
    self.event := event;
    self.info := info;
+end;
+
+procedure TSimpleStringList.SetItems(const idx: Integer;
+  const value: UnicodeString);
+begin
+
 end;
 
 end.

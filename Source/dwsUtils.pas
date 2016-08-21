@@ -192,6 +192,7 @@ type
 
    TSimpleCallbackStatus = (csContinue, csAbort);
 
+(*
    TSimpleCallback<T> = function (var item : T) : TSimpleCallbackStatus;
 
    // TSimpleList<T>
@@ -219,7 +220,66 @@ type
          property Items[const position : Integer] : T read GetItems write SetItems; default;
          property Count : Integer read FCount;
    end;
+*)
 
+   TSimpleCallbackInt64 = function (var item : Int64) : TSimpleCallbackStatus;
+
+   // TSimpleListInt64
+   //
+   {: A minimalistic generic list class. }
+   TSimpleListInt64 = class
+      private
+         type
+            TArrayOfInt64 = array of Int64;
+         var
+            FItems : TArrayOfInt64;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : Int64; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : Int64);
+
+      public
+         procedure Add(const item : Int64);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackInt64);
+         property Items[const position : Integer] : Int64 read GetItems write SetItems; default;
+         property Count : Integer read FCount;
+   end;
+
+
+   TSimpleCallbackDouble = function (var item : Double) : TSimpleCallbackStatus;
+
+   // TSimpleListDouble
+   //
+   {: A minimalistic generic list class. }
+   TSimpleListDouble = class
+      private
+         type
+            TArrayOfDouble = array of Double;
+         var
+            FItems : TArrayOfDouble;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : Double; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : Double);
+
+      public
+         procedure Add(const item : Double);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackDouble);
+         property Items[const position : Integer] : Double read GetItems write SetItems; default;
+         property Count : Integer read FCount;
+   end;
+
+(*
    // TObjectList
    //
    {: A simple generic object list, owns objects }
@@ -275,6 +335,7 @@ type
          property Items[index : Integer] : T read GetItem; default;
          property Count : Integer read FCount;
    end;
+*)
 
    // TSimpleStack<T>
    //
@@ -282,9 +343,9 @@ type
       Note that internal array items are NOT cleared on Pop, for refcounted types,
       you need to clear yourself manually via Peek. }
    TSimpleStack<T> = class
+      type
+        ArrayT = array of T;
       private
-      type ArrayT = array of T;
-      var
          FItems : ArrayT;
          FCount : Integer;
          FCapacity : Integer;
@@ -303,6 +364,54 @@ type
          property Count : Integer read FCount;
    end;
 
+   // TSimpleStackBoolean
+   //
+   TSimpleStackBoolean = class
+      private
+      type ArrayBoolean = array of Boolean;
+      var
+         FItems : ArrayBoolean;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : Boolean; inline;
+         procedure SetPeek(const item : Boolean);
+         function GetItems(const position : Integer) : Boolean;
+         procedure SetItems(const position : Integer; const value : Boolean);
+      public
+         procedure Push(const item : Boolean);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : Boolean read GetPeek write SetPeek;
+         property Items[const position : Integer] : Boolean read GetItems write SetItems;
+         property Count : Integer read FCount;
+   end;
+
+   // TSimpleStackString
+   //
+   TSimpleStackString = class
+      private
+      type ArrayUnicodeString = array of UnicodeString;
+      var
+         FItems : ArrayUnicodeString;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : UnicodeString; inline;
+         procedure SetPeek(const item : UnicodeString);
+         function GetItems(const position : Integer) : UnicodeString;
+         procedure SetItems(const position : Integer; const value : UnicodeString);
+      public
+         procedure Push(const item : UnicodeString);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : UnicodeString read GetPeek write SetPeek;
+         property Items[const position : Integer] : UnicodeString read GetItems write SetItems;
+         property Count : Integer read FCount;
+   end;
+
    PSimpleIntegerStackChunk = ^TSimpleIntegerStackChunk;
    TSimpleIntegerStackChunk = record
       public
@@ -314,7 +423,6 @@ type
 
    // TSimpleIntegerStack
    //
-   {: A minimalistic chunked integer stack. }
    TSimpleIntegerStack = class
       private
          FChunk : PSimpleIntegerStackChunk;
@@ -351,6 +459,7 @@ type
    TSimpleHashAction = (shaNone, shaRemove);
    TSimpleHashFunc<T> = function (const item : T) : TSimpleHashAction of object;
 
+(*
    {: Minimalistic open-addressing hash, subclasses must override SameItem and GetItemHashCode.
       HashCodes *MUST* be non zero }
    TSimpleHash<T> = class
@@ -383,14 +492,32 @@ type
 
          property Count : Integer read FCount;
    end;
+*)
 
-   TSimpleObjectHash<T{$IFNDEF FPC}: TRefCountedObject{$ENDIF}> = class(TSimpleHash<T>)
+   TSimpleObjectHash = class
+      private
+         FBuckets : array of TSimpleHashBucket<TRefCountedObject>;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
       protected
-         function SameItem(const item1, item2 : T) : Boolean; override;
-         function GetItemHashCode(const item1 : T) : Integer; override;
+         procedure Grow;
+         function LinearFind(const item : TRefCountedObject; var index : Integer) : Boolean;
+         function SameItem(const item1, item2 : TRefCountedObject) : Boolean;
+         function GetItemHashCode(const item1 : TRefCountedObject) : Integer;
 
       public
+         function Add(const anItem : TRefCountedObject) : Boolean; // true if added
+         function Replace(const anItem : TRefCountedObject) : Boolean; // true if added
+         function Remove(const anItem : TRefCountedObject) : Boolean; // true if removed
+         function Contains(const anItem : TRefCountedObject) : Boolean;
+         function Match(var anItem : TRefCountedObject) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashFunc<TRefCountedObject>);
+         procedure Clear;
          procedure Clean;
+
+         property Count : Integer read FCount;
    end;
 
    TNameObjectHashBucket = record
@@ -452,7 +579,7 @@ type
          function Names : TStringDynArray;
    end;
 
-   TSimpleRefCountedObjectHash = class (TSimpleObjectHash<TRefCountedObject>);
+   TSimpleRefCountedObjectHash = class (TSimpleObjectHash);
 
    TSimpleNameObjectHash<T{$IFNDEF FPC}: class{$ENDIF}> = class
       private
@@ -527,15 +654,63 @@ type
       Value : T;
    end;
 
-   TCaseInsensitiveNameValueHash<T> = class (TSimpleHash<TNameValueHashBucket<T>>)
-      protected
-         function SameItem(const item1, item2 : TNameValueHashBucket<T>) : Boolean; override;
-         function GetItemHashCode(const item1 : TNameValueHashBucket<T>) : Integer; override;
+   TNameValueHashBucketInteger = record
+      Name : String;
+      Value : Integer;
    end;
 
-   TObjectsLookup = class (TSortedList<TRefCountedObject>)
+   TCaseInsensitiveNameValueHashInteger = class
+      private
+         FBuckets : array of TSimpleHashBucket<TNameValueHashBucketInteger>;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
       protected
-         function Compare(const item1, item2 : TRefCountedObject) : Integer; override;
+         procedure Grow;
+         function LinearFind(const item : TNameValueHashBucketInteger; var index : Integer) : Boolean;
+         function SameItem(const item1, item2 : TNameValueHashBucketInteger) : Boolean;
+         function GetItemHashCode(const item1 : TNameValueHashBucketInteger) : Integer;
+
+      public
+         function Add(const anItem : TNameValueHashBucketInteger) : Boolean; // true if added
+         function Replace(const anItem : TNameValueHashBucketInteger) : Boolean; // true if added
+         function Remove(const anItem : TNameValueHashBucketInteger) : Boolean; // true if removed
+         function Contains(const anItem : TNameValueHashBucketInteger) : Boolean;
+         function Match(var anItem : TNameValueHashBucketInteger) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashFunc<TNameValueHashBucketInteger>);
+         procedure Clear;
+
+         property Count : Integer read FCount;
+   end;
+
+   TSimpleCallbackObject = function (var item : TObject) : TSimpleCallbackStatus;
+
+   TObjectsLookup = class
+      private
+         type
+            TArrayOfObject = array of TObject;
+         var
+            FItems : TArrayOfObject;
+            FCount : Integer;
+
+      protected
+         function GetItem(index : Integer) : TObject;
+         function Find(const item : TObject; var index : Integer) : Boolean;
+         function Compare(const item1, item2 : TObject) : Integer;
+         procedure InsertItem(index : Integer; const anItem : TObject);
+
+      public
+         function Add(const anItem : TObject) : Integer;
+         function AddOrFind(const anItem : TObject; var added : Boolean) : Integer;
+         function Extract(const anItem : TObject) : Integer;
+         function ExtractAt(index : Integer) : TObject;
+         function IndexOf(const anItem : TObject) : Integer;
+         procedure Clear;
+         procedure Clean;
+         procedure Enumerate(const callback : TSimpleCallbackObject);
+         property Items[index : Integer] : TObject read GetItem; default;
+         property Count : Integer read FCount;
    end;
 
    TStringUnifierBucket = record
@@ -569,6 +744,8 @@ type
          property Count : Integer read FCount;
          procedure Clear;
    end;
+
+   TSimpleCallback<T> = function (var item : T) : TSimpleCallbackStatus;
 
    TThreadCached<T> = class
       private
@@ -731,7 +908,7 @@ type
          function ToString : String; override;
    end;
 
-   TSimpleInt64List = class(TSimpleList<Int64>)
+   TSimpleInt64List = class(TSimpleListInt64)
       protected
          procedure DoExchange(index1, index2 : Integer); inline;
          procedure QuickSort(minIndex, maxIndex : Integer);
@@ -740,7 +917,7 @@ type
          procedure Sort;
    end;
 
-   TSimpleDoubleList = class(TSimpleList<Double>)
+   TSimpleDoubleList = class(TSimpleListDouble)
       protected
          procedure DoExchange(index1, index2 : Integer); inline;
          procedure QuickSort(minIndex, maxIndex : Integer);
@@ -751,10 +928,29 @@ type
          function Sum : Double;
    end;
 
-   TSimpleStringHash = class(TSimpleHash<String>)
+   TSimpleStringHash = class
+      private
+         FBuckets : array of TSimpleHashBucket<String>;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
       protected
-         function SameItem(const item1, item2 : String) : Boolean; override;
-         function GetItemHashCode(const item1 : String) : Integer; override;
+         procedure Grow;
+         function LinearFind(const item : String; var index : Integer) : Boolean;
+         function SameItem(const item1, item2 : String) : Boolean;
+         function GetItemHashCode(const item1 : String) : Integer;
+
+      public
+         function Add(const anItem : String) : Boolean; // true if added
+         function Replace(const anItem : String) : Boolean; // true if added
+         function Remove(const anItem : String) : Boolean; // true if removed
+         function Contains(const anItem : String) : Boolean;
+         function Match(var anItem : String) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashFunc<String>);
+         procedure Clear;
+
+         property Count : Integer read FCount;
    end;
 
    TFastCompareStringList = class (TStringList)
@@ -3290,6 +3486,147 @@ begin
 end;
 
 // ------------------
+// ------------------ TSimpleListInt64 ------------------
+// ------------------
+
+// Add
+//
+procedure TSimpleListInt64.Add(const item : Int64);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Extract
+//
+procedure TSimpleListInt64.Extract(idx : Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(Int64);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(Int64));
+      FillChar(FItems[FCount-1], SizeOf(Int64), 0);
+   end;
+   Dec(FCount);
+end;
+
+// Clear
+//
+procedure TSimpleListInt64.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TSimpleListInt64.Enumerate(const callback : TSimpleCallbackInt64);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Grow
+//
+procedure TSimpleListInt64.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// GetItems
+//
+function TSimpleListInt64.GetItems(const idx : Integer) : Int64;
+begin
+   Result:=FItems[idx];
+end;
+
+// SetItems
+//
+procedure TSimpleListInt64.SetItems(const idx : Integer; const value : Int64);
+begin
+   FItems[idx]:=value;
+end;
+
+// ------------------
+// ------------------ TSimpleListDouble ------------------
+// ------------------
+
+// Add
+//
+procedure TSimpleListDouble.Add(const item : Double);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Extract
+//
+procedure TSimpleListDouble.Extract(idx : Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(Double);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(Double));
+      FillChar(FItems[FCount-1], SizeOf(Double), 0);
+   end;
+   Dec(FCount);
+end;
+
+// Clear
+//
+procedure TSimpleListDouble.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TSimpleListDouble.Enumerate(const callback : TSimpleCallbackDouble);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Grow
+//
+procedure TSimpleListDouble.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// GetItems
+//
+function TSimpleListDouble.GetItems(const idx : Integer) : Double;
+begin
+   Result:=FItems[idx];
+end;
+
+// SetItems
+//
+procedure TSimpleListDouble.SetItems(const idx : Integer; const value : Double);
+begin
+   FItems[idx]:=value;
+end;
+
+(*
+// ------------------
 // ------------------ TObjectList<T> ------------------
 // ------------------
 
@@ -3494,6 +3831,7 @@ begin
       if callback(FItems[i])=csAbort then
          Break;
 end;
+*)
 
 // ------------------
 // ------------------ TSimpleStack<T> ------------------
@@ -3559,6 +3897,138 @@ begin
    FCount:=0;
    FCapacity:=0;
 end;
+
+// ------------------
+// ------------------ TSimpleStackString ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackString.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackString.Push(const item : UnicodeString);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackString.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackString.GetPeek : UnicodeString;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackString.SetPeek(const item : UnicodeString);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackString.GetItems(const position : Integer) : UnicodeString;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackString.SetItems(const position : Integer; const value : UnicodeString);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackString.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
+end;
+
+
+// ------------------
+// ------------------ TSimpleStackBoolean ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackBoolean.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackBoolean.Push(const item : Boolean);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackBoolean.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackBoolean.GetPeek : Boolean;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackBoolean.SetPeek(const item : Boolean);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackBoolean.GetItems(const position : Integer) : Boolean;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackBoolean.SetItems(const position : Integer; const value : Boolean);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackBoolean.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
+end;
+
 
 // ------------------
 // ------------------ TWriteOnlyBlockStream ------------------
@@ -4088,6 +4558,7 @@ begin
    FList:=nil;
 end;
 
+(*
 // ------------------
 // ------------------ TSimpleHash<T> ------------------
 // ------------------
@@ -4254,21 +4725,177 @@ begin
    FGrowth:=0;
    FBuckets:=nil;
 end;
+*)
 
 // ------------------
-// ------------------ TSimpleObjectHash<T> ------------------
+// ------------------ TSimpleObjectHash ------------------
 // ------------------
+
+// Grow
+//
+procedure TSimpleObjectHash.Grow;
+var
+   i, j, n : Integer;
+   hashCode : Integer;
+   oldBuckets : array of TSimpleHashBucket<TRefCountedObject>;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TSimpleObjectHash.LinearFind(const item : TRefCountedObject; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TSimpleObjectHash.Add(const anItem : TRefCountedObject) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TSimpleObjectHash.Replace(const anItem : TRefCountedObject) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TSimpleObjectHash.Remove(const anItem : TRefCountedObject) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TRefCountedObject);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TSimpleObjectHash.Contains(const anItem : TRefCountedObject) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TSimpleObjectHash.Match(var anItem : TRefCountedObject) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TSimpleObjectHash.Enumerate(callBack : TSimpleHashFunc<TRefCountedObject>);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TRefCountedObject);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TSimpleObjectHash.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
 
 // SameItem
 //
-function TSimpleObjectHash<T>.SameItem(const item1, item2 : T) : Boolean;
+function TSimpleObjectHash.SameItem(const item1, item2 : TRefCountedObject) : Boolean;
 begin
    Result:=(item1=item2);
 end;
 
 // GetItemHashCode
 //
-function TSimpleObjectHash<T>.GetItemHashCode(const item1 : T) : Integer;
+function TSimpleObjectHash.GetItemHashCode(const item1 : TRefCountedObject) : Integer;
 var
    p : NativeInt;
 begin
@@ -4278,7 +4905,7 @@ end;
 
 // Clean
 //
-procedure TSimpleObjectHash<T>.Clean;
+procedure TSimpleObjectHash.Clean;
 var
    i : Integer;
 begin
@@ -4288,6 +4915,7 @@ begin
    Clear;
 end;
 
+(*
 // ------------------
 // ------------------ TSimpleList<T> ------------------
 // ------------------
@@ -4357,14 +4985,135 @@ procedure TSimpleList<T>.SetItems(const idx : Integer; const value : T);
 begin
    FItems[idx]:=value;
 end;
+*)
 
 // ------------------
 // ------------------ TObjectsLookup ------------------
 // ------------------
 
+// GetItem
+//
+function TObjectsLookup.GetItem(index : Integer) : TObject;
+begin
+   Result:=FItems[index];
+end;
+
+// Find
+//
+function TObjectsLookup.Find(const item : TObject; var index : Integer) : Boolean;
+var
+   lo, hi, mid, compResult : Integer;
+begin
+   Result:=False;
+   lo:=0;
+   hi:=FCount-1;
+   while lo<=hi do begin
+      mid:=(lo+hi) shr 1;
+      compResult:=Compare(FItems[mid], item);
+      if compResult<0 then
+         lo:=mid+1
+      else begin
+         hi:=mid- 1;
+         if compResult=0 then
+            Result:=True;
+      end;
+   end;
+   index:=lo;
+end;
+
+// InsertItem
+//
+procedure TObjectsLookup.InsertItem(index : Integer; const anItem : TObject);
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   if index<Count then
+      System.Move(FItems[index], FItems[index+1], (Count-index)*SizeOf(Pointer));
+   Inc(FCount);
+   FItems[index]:=anItem;
+end;
+
+// Add
+//
+function TObjectsLookup.Add(const anItem : TObject) : Integer;
+begin
+   Find(anItem, Result);
+   InsertItem(Result, anItem);
+end;
+
+// AddOrFind
+//
+function TObjectsLookup.AddOrFind(const anItem : TObject; var added : Boolean) : Integer;
+begin
+   added:=not Find(anItem, Result);
+   if added then
+      InsertItem(Result, anItem);
+end;
+
+// Extract
+//
+function TObjectsLookup.Extract(const anItem : TObject) : Integer;
+begin
+   if Find(anItem, Result) then
+      ExtractAt(Result)
+   else Result:=-1;
+end;
+
+// ExtractAt
+//
+function TObjectsLookup.ExtractAt(index : Integer) : TObject;
+var
+   n : Integer;
+begin
+   Dec(FCount);
+   Result:=FItems[index];
+   n:=FCount-index;
+   if n>0 then
+      System.Move(FItems[index+1], FItems[index], n*SizeOf(TObject));
+   SetLength(FItems, FCount);
+end;
+
+// IndexOf
+//
+function TObjectsLookup.IndexOf(const anItem : TObject) : Integer;
+begin
+   if not Find(anItem, Result) then
+      Result:=-1;
+end;
+
+// Clear
+//
+procedure TObjectsLookup.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+end;
+
+// Clean
+//
+procedure TObjectsLookup.Clean;
+var
+   i : Integer;
+begin
+   for i:=0 to FCount-1 do
+      FItems[i].Free;
+   Clear;
+end;
+
+// Enumerate
+//
+procedure TObjectsLookup.Enumerate(const callback : TSimpleCallbackObject);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callback(FItems[i])=csAbort then
+         Break;
+end;
+
 // Compare
 //
-function TObjectsLookup.Compare(const item1, item2 : TRefCountedObject) : Integer;
+function TObjectsLookup.Compare(const item1, item2 : TObject) : Integer;
 begin
    if NativeUInt(item1)<NativeUInt(item2) then
       Result:=-1
@@ -5660,16 +6409,171 @@ end;
 // ------------------ TCaseInsensitiveNameValueHash<T> ------------------
 // ------------------
 
+// Grow
+//
+procedure TCaseInsensitiveNameValueHashInteger.Grow;
+var
+   i, j, n : Integer;
+   hashCode : Integer;
+   oldBuckets : array of TSimpleHashBucket<TNameValueHashBucketInteger>;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TCaseInsensitiveNameValueHashInteger.LinearFind(const item : TNameValueHashBucketInteger; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TCaseInsensitiveNameValueHashInteger.Add(const anItem : TNameValueHashBucketInteger) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TCaseInsensitiveNameValueHashInteger.Replace(const anItem : TNameValueHashBucketInteger) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TCaseInsensitiveNameValueHashInteger.Remove(const anItem : TNameValueHashBucketInteger) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TNameValueHashBucketInteger);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TCaseInsensitiveNameValueHashInteger.Contains(const anItem : TNameValueHashBucketInteger) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TCaseInsensitiveNameValueHashInteger.Match(var anItem : TNameValueHashBucketInteger) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TCaseInsensitiveNameValueHashInteger.Enumerate(callBack : TSimpleHashFunc<TNameValueHashBucketInteger>);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TNameValueHashBucketInteger);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TCaseInsensitiveNameValueHashInteger.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
+
 // SameItem
 //
-function TCaseInsensitiveNameValueHash<T>.SameItem(const item1, item2 : TNameValueHashBucket<T>) : Boolean;
+function TCaseInsensitiveNameValueHashInteger.SameItem(const item1, item2 : TNameValueHashBucketInteger) : Boolean;
 begin
    Result:=UnicodeSameText(item1.Name, item2.Name);
 end;
 
 // GetItemHashCode
 //
-function TCaseInsensitiveNameValueHash<T>.GetItemHashCode(const item1 : TNameValueHashBucket<T>) : Integer;
+function TCaseInsensitiveNameValueHashInteger.GetItemHashCode(const item1 : TNameValueHashBucketInteger) : Integer;
 begin
    Result:=SimpleLowerCaseStringHash(item1.Name);
 end;
@@ -5677,6 +6581,161 @@ end;
 // ------------------
 // ------------------ TSimpleStringHash ------------------
 // ------------------
+
+// Grow
+//
+procedure TSimpleStringHash.Grow;
+var
+   i, j, n : Integer;
+   hashCode : Integer;
+   oldBuckets : array of TSimpleHashBucket<String>;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TSimpleStringHash.LinearFind(const item : String; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TSimpleStringHash.Add(const anItem : String) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TSimpleStringHash.Replace(const anItem : String) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TSimpleStringHash.Remove(const anItem : String) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(String);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TSimpleStringHash.Contains(const anItem : String) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TSimpleStringHash.Match(var anItem : String) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TSimpleStringHash.Enumerate(callBack : TSimpleHashFunc<String>);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(String);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TSimpleStringHash.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
 
 // SameItem
 //
@@ -5955,6 +7014,7 @@ end;
 // ------------------------------------------------------------------
 // ------------------------------------------------------------------
 // ------------------------------------------------------------------
+
 initialization
 // ------------------------------------------------------------------
 // ------------------------------------------------------------------

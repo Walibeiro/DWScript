@@ -1730,7 +1730,28 @@ type
 
    TCaseConditionClass = class of TCaseCondition;
 
-   TCaseConditions = TObjectList<TCaseCondition>;
+   TCaseConditions = class
+         private
+         type
+            TArrayOfCaseCondition = array of TCaseCondition;
+         var
+            FItems : TArrayOfCaseCondition;
+            FCount : Integer;
+
+      protected
+         function GetItem(index : Integer) : TCaseCondition; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItem(index : Integer; const item : TCaseCondition);
+
+      public
+         destructor Destroy; override;
+         function Add(const anItem : TCaseCondition) : Integer;
+         function IndexOf(const anItem : TCaseCondition) : Integer;
+         function Extract(idx : Integer) : TCaseCondition;
+         procedure ExtractAll;
+         procedure Clear;
+         property Items[index : Integer] : TCaseCondition read GetItem write SetItem; default;
+         property Count : Integer read FCount;
+  end;
 
    TCaseConditionsHelper = class
       public
@@ -7193,6 +7214,88 @@ begin
       exec.DoStep(FElseExpr);
       FElseExpr.EvalNoResult(exec);
    end;
+end;
+
+// ------------------
+// ------------------ TCaseConditions ------------------
+// ------------------
+
+// Destroy
+//
+destructor TCaseConditions.Destroy;
+begin
+   Clear;
+   inherited;
+end;
+
+// GetItem
+//
+function TCaseConditions.GetItem(index : Integer) : TCaseCondition;
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   Result:=FItems[index];
+end;
+
+// SetItem
+//
+procedure TCaseConditions.SetItem(index : Integer; const item : TCaseCondition);
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   FItems[index]:=item;
+end;
+
+// Add
+//
+function TCaseConditions.Add(const anItem : TCaseCondition) : Integer;
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   FItems[FCount]:=anItem;
+   Result:=FCount;
+   Inc(FCount);
+end;
+
+// IndexOf
+//
+function TCaseConditions.IndexOf(const anItem : TCaseCondition) : Integer;
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if FItems[i]=anItem then Exit(i);
+   Result:=-1;
+end;
+
+// Extract
+//
+function TCaseConditions.Extract(idx : Integer) : TCaseCondition;
+var
+   n : Integer;
+begin
+   Assert(Cardinal(idx)<Cardinal(FCount), 'Index out of range');
+   n:=Count-1-idx;
+   Dec(FCount);
+   if n>0 then
+      System.Move(FItems[idx+1], FItems[idx], SizeOf(TCaseCondition)*n);
+   Result:=FItems[idx];
+end;
+
+// ExtractAll
+//
+procedure TCaseConditions.ExtractAll;
+begin
+   FCount:=0;
+end;
+
+// Clear
+//
+procedure TCaseConditions.Clear;
+var
+   i : Integer;
+begin
+   for i:=FCount-1 downto 0 do
+      FItems[i].Free;
+   FCount:=0;
 end;
 
 // ------------------

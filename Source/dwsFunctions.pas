@@ -30,7 +30,6 @@ uses
   dwsOperators, dwsUnitSymbols;
 
 type
-
    TIdwsUnitFlag = (ufImplicitUse, ufOwnsSymbolTable);
    TIdwsUnitFlags = set of TIdwsUnitFlag;
 
@@ -46,12 +45,36 @@ type
       function GetDeprecatedMessage : UnicodeString;
    end;
 
-   TIdwsUnitList = class (TSimpleList<IdwsUnit>)
+   TSimpleCallbackIdwsUnit = function (var item : IdwsUnit) : TSimpleCallbackStatus;
+
+   // TIdwsUnitList
+   //
+   {: A minimalistic generic list class. }
+   TIdwsUnitList = class
+      private
+         type
+            TArrayOfIdwsUnit = array of IdwsUnit;
+         var
+            FItems : TArrayOfIdwsUnit;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : IdwsUnit; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : IdwsUnit);
+
       public
+         procedure Add(const item : IdwsUnit);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackIdwsUnit);
          function IndexOfName(const unitName : UnicodeString) : Integer;
          function IndexOf(const aUnit : IdwsUnit) : Integer;
          procedure AddUnits(list : TIdwsUnitList);
          function FindDuplicateUnitName : UnicodeString;
+         property Items[const position : Integer] : IdwsUnit read GetItems write SetItems; default;
+         property Count : Integer read FCount;
    end;
 
    TEmptyFunc = class sealed (TInterfacedSelfObject, ICallable)
@@ -444,6 +467,76 @@ end;
 procedure TFunctionPrototype.CompileTimeCheck(prog : TdwsProgram; expr : TFuncExprBase);
 begin
    // nothing yet
+end;
+
+// ------------------
+// ------------------ TIdwsUnitList ------------------
+// ------------------
+
+// Add
+//
+procedure TIdwsUnitList.Add(const item : IdwsUnit);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Extract
+//
+procedure TIdwsUnitList.Extract(idx : Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(IdwsUnit);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(IdwsUnit));
+      FillChar(FItems[FCount-1], SizeOf(IdwsUnit), 0);
+   end;
+   Dec(FCount);
+end;
+
+// Clear
+//
+procedure TIdwsUnitList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TIdwsUnitList.Enumerate(const callback : TSimpleCallbackIdwsUnit);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Grow
+//
+procedure TIdwsUnitList.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// GetItems
+//
+function TIdwsUnitList.GetItems(const idx : Integer) : IdwsUnit;
+begin
+   Result:=FItems[idx];
+end;
+
+// SetItems
+//
+procedure TIdwsUnitList.SetItems(const idx : Integer; const value : IdwsUnit);
+begin
+   FItems[idx]:=value;
 end;
 
 // ------------------

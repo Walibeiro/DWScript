@@ -128,6 +128,33 @@ type
    end;
    TSymbolPosition = ^TSymbolPositionRec;
 
+   TSimpleCallbackSymbolPosition = function (var item : TSymbolPosition ) : TSimpleCallbackStatus;
+
+   // TSimpleListSymbolPosition
+   //
+   TSimpleListSymbolPosition = class
+      private
+         type
+            TArrayOfSymbolPosition = array of TSymbolPosition;
+         var
+            FItems : TArrayOfSymbolPosition;
+            FCount : Integer;
+            FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : TSymbolPosition; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : TSymbolPosition);
+
+      public
+         procedure Add(const item : TSymbolPosition);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackSymbolPosition);
+         property Items[const position : Integer] : TSymbolPosition read GetItems write SetItems; default;
+         property Count : Integer read FCount;
+   end;
+
    {Re-list every symbol (pointer to it) and every position it is in in the script }
    TSymbolPositionList = class (TRefCountedObject)
       type
@@ -141,7 +168,7 @@ type
 
       private
          FSymbol : TSymbol;                        // pointer to the symbol
-         FPosList : TSimpleList<TSymbolPosition>;  // list of positions where symbol is declared and used
+         FPosList : TSimpleListSymbolPosition;  // list of positions where symbol is declared and used
          FSourceFile : TSourceFile; // not nil only if all positions are in that file
 
       protected
@@ -171,9 +198,35 @@ type
          property Symbol: TSymbol read FSymbol;
    end;
 
-   TSymbolPositionListList = class(TSortedList<TSymbolPositionList>)
+   TSimpleCallbackSymbolPositionList = function (var item : TSymbolPositionList) : TSimpleCallbackStatus;
+
+   // TSymbolPositionListList
+   //
+   TSymbolPositionListList = class
+      private
+         type
+            TArraySymbolPositionList = array of TSymbolPositionList;
+         var
+            FItems : TArraySymbolPositionList;
+            FCount : Integer;
+
       protected
-         function Compare(const item1, item2 : TSymbolPositionList) : Integer; override;
+         function GetItem(index : Integer) : TSymbolPositionList;
+         function Find(const item : TSymbolPositionList; var index : Integer) : Boolean;
+         procedure InsertItem(index : Integer; const anItem : TSymbolPositionList);
+         function Compare(const item1, item2 : TSymbolPositionList) : Integer;
+
+      public
+         function Add(const anItem : TSymbolPositionList) : Integer;
+         function AddOrFind(const anItem : TSymbolPositionList; var added : Boolean) : Integer;
+         function Extract(const anItem : TSymbolPositionList) : Integer;
+         function ExtractAt(index : Integer) : TSymbolPositionList;
+         function IndexOf(const anItem : TSymbolPositionList) : Integer;
+         procedure Clear;
+         procedure Clean;
+         procedure Enumerate(const callback : TSimpleCallbackSymbolPositionList);
+         property Items[index : Integer] : TSymbolPositionList read GetItem; default;
+         property Count : Integer read FCount;
    end;
 
    TdwsSymbolDictionaryProc = procedure (sym : TSymbol) of object;
@@ -340,13 +393,28 @@ type
    TdwsSymbolAttributeArray = array of TdwsSymbolAttribute;
 
    // Holds all symbol attributes
-   TdwsSymbolAttributes = class (TObjectList<TdwsSymbolAttribute>)
+   TdwsSymbolAttributes = class
       private
+         type
+            TArrayOfdwsSymbolAttribute = array of TdwsSymbolAttribute;
+         var
+            FItems : TArrayOfdwsSymbolAttribute;
+            FCount : Integer;
 
       protected
+         function GetItem(index : Integer) : TdwsSymbolAttribute; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItem(index : Integer; const item : TdwsSymbolAttribute);
 
       public
+         destructor Destroy; override;
+         function Add(const anItem : TdwsSymbolAttribute) : Integer;
+         function IndexOf(const anItem : TdwsSymbolAttribute) : Integer;
+         function Extract(idx : Integer) : TdwsSymbolAttribute;
+         procedure ExtractAll;
+         procedure Clear;
          function AttributesFor(aSymbol : TSymbol) : TdwsSymbolAttributeArray;
+         property Items[index : Integer] : TdwsSymbolAttribute read GetItem write SetItem; default;
+         property Count : Integer read FCount;
    end;
 
    TProgramEvent = procedure (Prog: TdwsProgram) of object;
@@ -539,10 +607,18 @@ type
       Value : Variant;
    end;
 
-   TdwsCustomStates = class (TSimpleHash<TdwsCustomState>)
+   TdwsCustomStates = class
+      private
+         FBuckets : array of TSimpleHashBucket<TdwsCustomState>;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
       protected
-         function SameItem(const item1, item2 : TdwsCustomState) : Boolean; override;
-         function GetItemHashCode(const item1 : TdwsCustomState) : Integer; override;
+         procedure Grow;
+         function LinearFind(const item : TdwsCustomState; var index : Integer) : Boolean;
+         function SameItem(const item1, item2 : TdwsCustomState) : Boolean;
+         function GetItemHashCode(const item1 : TdwsCustomState) : Integer;
 
          function AddClonedState(const item : TdwsCustomState) : TSimpleHashAction;
 
@@ -550,12 +626,21 @@ type
          procedure SetState(const index : TGUID; const v : Variant);
 
       public
-         property States[const index : TGUID] : Variant read GetState write SetState; default;
+         function Add(const anItem : TdwsCustomState) : Boolean; // true if added
+         function Replace(const anItem : TdwsCustomState) : Boolean; // true if added
+         function Remove(const anItem : TdwsCustomState) : Boolean; // true if removed
+         function Contains(const anItem : TdwsCustomState) : Boolean;
+         function Match(var anItem : TdwsCustomState) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashFunc<TdwsCustomState>);
+         procedure Clear;
 
          function IntegerStateDef(const index : TGUID; const default : Integer) : Integer;
          function StringStateDef(const index : TGUID; const default : String) : String;
 
          function Clone : TdwsCustomStates;
+
+         property Count : Integer read FCount;
+         property States[const index : TGUID] : Variant read GetState write SetState; default;
    end;
 
    TdwsCustomInterface = record
@@ -563,15 +648,33 @@ type
       Value : IInterface;
    end;
 
-   TdwsCustomInterfaces = class (TSimpleHash<TdwsCustomInterface>)
+   TdwsCustomInterfaces = class
+      private
+         FBuckets : array of TSimpleHashBucket<TdwsCustomInterface>;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
       protected
-         function SameItem(const item1, item2 : TdwsCustomInterface) : Boolean; override;
-         function GetItemHashCode(const item1 : TdwsCustomInterface) : Integer; override;
+         function SameItem(const item1, item2 : TdwsCustomInterface) : Boolean;
+         function GetItemHashCode(const item1 : TdwsCustomInterface) : Integer;
 
          function  GetInterface(const index : TGUID) : IInterface; inline;
          procedure SetInterface(const index : TGUID; const intf : IInterface); inline;
 
+         procedure Grow;
+         function LinearFind(const item : TdwsCustomInterface; var index : Integer) : Boolean;
+
       public
+         function Add(const anItem : TdwsCustomInterface) : Boolean; // true if added
+         function Replace(const anItem : TdwsCustomInterface) : Boolean; // true if added
+         function Remove(const anItem : TdwsCustomInterface) : Boolean; // true if removed
+         function Contains(const anItem : TdwsCustomInterface) : Boolean;
+         function Match(var anItem : TdwsCustomInterface) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashFunc<TdwsCustomInterface>);
+         procedure Clear;
+
+         property Count : Integer read FCount;
          property Interfaces[const index : TGUID] : IInterface read GetInterface write SetInterface; default;
    end;
 
@@ -776,6 +879,28 @@ type
          property TypAnyType: TAnyTypeSymbol read FBaseTypes.FTypAnyType;
    end;
 
+   TSimpleStackRefCountedObject = class
+      type
+        TArrayOfRefCountedObject = array of TRefCountedObject;
+      private
+         FItems : TArrayOfRefCountedObject;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : TRefCountedObject; inline;
+         procedure SetPeek(const item : TRefCountedObject);
+         function GetItems(const position : Integer) : TRefCountedObject;
+         procedure SetItems(const position : Integer; const value : TRefCountedObject);
+      public
+         procedure Push(const item : TRefCountedObject);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : TRefCountedObject read GetPeek write SetPeek;
+         property Items[const position : Integer] : TRefCountedObject read GetItems write SetItems;
+         property Count : Integer read FCount;
+   end;
+
    // A script main executable program
    TdwsMainProgram = class (TdwsProgram, IdwsProgram)
       private
@@ -807,7 +932,7 @@ type
          FTimeStamp : TDateTime;
          FCompileDuration : TDateTime;
          FCompiler : TObject;
-         FOrphanedObjects : TSimpleStack<TRefCountedObject>;
+         FOrphanedObjects : TSimpleStackRefCountedObject;
 
          FTypDefaultConstructor : TMethodSymbol;
          FTypDefaultDestructor : TMethodSymbol;
@@ -3061,6 +3186,71 @@ begin
 end;
 
 // ------------------
+// ------------------ TSimpleStackRefCountedObject ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackRefCountedObject.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackRefCountedObject.Push(const item : TRefCountedObject);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackRefCountedObject.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackRefCountedObject.GetPeek : TRefCountedObject;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackRefCountedObject.SetPeek(const item : TRefCountedObject);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackRefCountedObject.GetItems(const position : Integer) : TRefCountedObject;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackRefCountedObject.SetItems(const position : Integer; const value : TRefCountedObject);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackRefCountedObject.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
+end;
+
+// ------------------
 // ------------------ TdwsMainProgram ------------------
 // ------------------
 
@@ -3116,7 +3306,7 @@ begin
    FTypDefaultConstructor:=TypTObject.Members.FindSymbol(SYS_TOBJECT_CREATE, cvPublic) as TMethodSymbol;
    FTypDefaultDestructor:=TypTObject.Members.FindSymbol(SYS_TOBJECT_DESTROY, cvPublic) as TMethodSymbol;
 
-   FOrphanedObjects := TSimpleStack<TRefCountedObject>.Create;
+   FOrphanedObjects := TSimpleStackRefCountedObject.Create;
 
    FRoot:=Self;
 end;
@@ -8034,6 +8224,79 @@ begin
 end;
 
 // ------------------
+// ------------------ TSimpleListSymbolPosition ------------------
+// ------------------
+
+// Add
+//
+procedure TSimpleListSymbolPosition.Add(const item: TSymbolPosition);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Clear
+//
+procedure TSimpleListSymbolPosition.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TSimpleListSymbolPosition.Enumerate(
+  const callback: TSimpleCallbackSymbolPosition);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Extract
+//
+procedure TSimpleListSymbolPosition.Extract(idx: Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(TSymbolPosition);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(TSymbolPosition));
+      FillChar(FItems[FCount-1], SizeOf(TSymbolPosition), 0);
+   end;
+   Dec(FCount);
+end;
+
+// GetItems
+//
+function TSimpleListSymbolPosition.GetItems(
+  const idx: Integer): TSymbolPosition;
+begin
+   Result:=FItems[idx];
+end;
+
+// Grow
+//
+procedure TSimpleListSymbolPosition.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// SetItems
+//
+procedure TSimpleListSymbolPosition.SetItems(const idx: Integer;
+  const value: TSymbolPosition);
+begin
+   FItems[idx]:=value;
+end;
+
+// ------------------
 // ------------------ TSymbolPositionList ------------------
 // ------------------
 
@@ -8042,7 +8305,7 @@ end;
 constructor TSymbolPositionList.Create(ASymbol: TSymbol);
 begin
    FSymbol:=ASymbol;
-   FPosList:=TSimpleList<TSymbolPosition>.Create;
+   FPosList:=TSimpleListSymbolPosition.Create;
 end;
 
 // Destroy
@@ -8217,6 +8480,126 @@ end;
 // ------------------
 // ------------------ TSymbolPositionListList ------------------
 // ------------------
+
+// GetItem
+//
+function TSymbolPositionListList.GetItem(index : Integer) : TSymbolPositionList;
+begin
+   Result:=FItems[index];
+end;
+
+// Find
+//
+function TSymbolPositionListList.Find(const item : TSymbolPositionList; var index : Integer) : Boolean;
+var
+   lo, hi, mid, compResult : Integer;
+begin
+   Result:=False;
+   lo:=0;
+   hi:=FCount-1;
+   while lo<=hi do begin
+      mid:=(lo+hi) shr 1;
+      compResult:=Compare(FItems[mid], item);
+      if compResult<0 then
+         lo:=mid+1
+      else begin
+         hi:=mid- 1;
+         if compResult=0 then
+            Result:=True;
+      end;
+   end;
+   index:=lo;
+end;
+
+// InsertItem
+//
+procedure TSymbolPositionListList.InsertItem(index : Integer; const anItem : TSymbolPositionList);
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   if index<Count then
+      System.Move(FItems[index], FItems[index+1], (Count-index)*SizeOf(Pointer));
+   Inc(FCount);
+   FItems[index]:=anItem;
+end;
+
+// Add
+//
+function TSymbolPositionListList.Add(const anItem : TSymbolPositionList) : Integer;
+begin
+   Find(anItem, Result);
+   InsertItem(Result, anItem);
+end;
+
+// AddOrFind
+//
+function TSymbolPositionListList.AddOrFind(const anItem : TSymbolPositionList; var added : Boolean) : Integer;
+begin
+   added:=not Find(anItem, Result);
+   if added then
+      InsertItem(Result, anItem);
+end;
+
+// Extract
+//
+function TSymbolPositionListList.Extract(const anItem : TSymbolPositionList) : Integer;
+begin
+   if Find(anItem, Result) then
+      ExtractAt(Result)
+   else Result:=-1;
+end;
+
+// ExtractAt
+//
+function TSymbolPositionListList.ExtractAt(index : Integer) : TSymbolPositionList;
+var
+   n : Integer;
+begin
+   Dec(FCount);
+   Result:=FItems[index];
+   n:=FCount-index;
+   if n>0 then
+      System.Move(FItems[index+1], FItems[index], n*SizeOf(TSymbolPositionList));
+   SetLength(FItems, FCount);
+end;
+
+// IndexOf
+//
+function TSymbolPositionListList.IndexOf(const anItem : TSymbolPositionList) : Integer;
+begin
+   if not Find(anItem, Result) then
+      Result:=-1;
+end;
+
+// Clear
+//
+procedure TSymbolPositionListList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+end;
+
+// Clean
+//
+procedure TSymbolPositionListList.Clean;
+var
+   i : Integer;
+begin
+   for i:=0 to FCount-1 do
+      FItems[i].Free;
+   Clear;
+end;
+
+// Enumerate
+//
+procedure TSymbolPositionListList.Enumerate(const callback : TSimpleCallbackSymbolPositionList);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callback(FItems[i])=csAbort then
+         Break;
+end;
 
 // Compare
 //
@@ -9079,6 +9462,84 @@ end;
 // ------------------ TdwsSymbolAttributes ------------------
 // ------------------
 
+// Destroy
+//
+destructor TdwsSymbolAttributes.Destroy;
+begin
+   Clear;
+   inherited;
+end;
+
+// GetItem
+//
+function TdwsSymbolAttributes.GetItem(index : Integer) : TdwsSymbolAttribute;
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   Result:=FItems[index];
+end;
+
+// SetItem
+//
+procedure TdwsSymbolAttributes.SetItem(index : Integer; const item : TdwsSymbolAttribute);
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   FItems[index]:=item;
+end;
+
+// Add
+//
+function TdwsSymbolAttributes.Add(const anItem : TdwsSymbolAttribute) : Integer;
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   FItems[FCount]:=anItem;
+   Result:=FCount;
+   Inc(FCount);
+end;
+
+// IndexOf
+//
+function TdwsSymbolAttributes.IndexOf(const anItem : TdwsSymbolAttribute) : Integer;
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if FItems[i]=anItem then Exit(i);
+   Result:=-1;
+end;
+
+// Extract
+//
+function TdwsSymbolAttributes.Extract(idx : Integer) : TdwsSymbolAttribute;
+var
+   n : Integer;
+begin
+   Assert(Cardinal(idx)<Cardinal(FCount), 'Index out of range');
+   n:=Count-1-idx;
+   Dec(FCount);
+   if n>0 then
+      System.Move(FItems[idx+1], FItems[idx], SizeOf(TdwsSymbolAttribute)*n);
+   Result:=FItems[idx];
+end;
+
+// ExtractAll
+//
+procedure TdwsSymbolAttributes.ExtractAll;
+begin
+   FCount:=0;
+end;
+
+// Clear
+//
+procedure TdwsSymbolAttributes.Clear;
+var
+   i : Integer;
+begin
+   for i:=FCount-1 downto 0 do
+      FItems[i].Free;
+   FCount:=0;
+end;
+
 // AttributesFor
 //
 function TdwsSymbolAttributes.AttributesFor(aSymbol : TSymbol) : TdwsSymbolAttributeArray;
@@ -9100,6 +9561,161 @@ end;
 // ------------------
 // ------------------ TdwsCustomStates ------------------
 // ------------------
+
+// Grow
+//
+procedure TdwsCustomStates.Grow;
+var
+   i, j, n : Integer;
+   hashCode : Integer;
+   oldBuckets : array of TSimpleHashBucket<TdwsCustomState>;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TdwsCustomStates.LinearFind(const item : TdwsCustomState; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TdwsCustomStates.Add(const anItem : TdwsCustomState) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TdwsCustomStates.Replace(const anItem : TdwsCustomState) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TdwsCustomStates.Remove(const anItem : TdwsCustomState) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TdwsCustomState);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TdwsCustomStates.Contains(const anItem : TdwsCustomState) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TdwsCustomStates.Match(var anItem : TdwsCustomState) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TdwsCustomStates.Enumerate(callBack : TSimpleHashFunc<TdwsCustomState>);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TdwsCustomState);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TdwsCustomStates.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
 
 // SameItem
 //
@@ -9181,6 +9797,161 @@ end;
 // ------------------
 // ------------------ TdwsCustomInterfaces ------------------
 // ------------------
+
+// Grow
+//
+procedure TdwsCustomInterfaces.Grow;
+var
+   i, j, n : Integer;
+   hashCode : Integer;
+   oldBuckets : array of TSimpleHashBucket<TdwsCustomInterface>;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TdwsCustomInterfaces.LinearFind(const item : TdwsCustomInterface; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TdwsCustomInterfaces.Add(const anItem : TdwsCustomInterface) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TdwsCustomInterfaces.Replace(const anItem : TdwsCustomInterface) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TdwsCustomInterfaces.Remove(const anItem : TdwsCustomInterface) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TdwsCustomInterface);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TdwsCustomInterfaces.Contains(const anItem : TdwsCustomInterface) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TdwsCustomInterfaces.Match(var anItem : TdwsCustomInterface) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TdwsCustomInterfaces.Enumerate(callBack : TSimpleHashFunc<TdwsCustomInterface>);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TdwsCustomInterface);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TdwsCustomInterfaces.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
 
 // SameItem
 //

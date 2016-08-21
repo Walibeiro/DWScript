@@ -103,7 +103,37 @@ type
          property AsFileName[const x : Integer] : UnicodeString read GetAsFileName;
    end;
 
-   TSortedExprBaseList = class(TSortedList<TExprBase>);
+   TSimpleCallbackExprBase = function (var item : TExprBase) : TSimpleCallbackStatus;
+
+   // TSortedExprBaseList
+   //
+   TSortedExprBaseList = class
+      private
+         type
+            TArrayOFExprBase = array of TExprBase;
+         var
+            FItems : TArrayOFExprBase;
+            FCount : Integer;
+
+      protected
+         function GetItem(index : Integer) : TExprBase;
+         function Find(const item : TExprBase; var index : Integer) : Boolean;
+         function Compare(const item1, item2 : TExprBase) : Integer; virtual; abstract;
+         procedure InsertItem(index : Integer; const anItem : TExprBase);
+
+      public
+         function Add(const anItem : TExprBase) : Integer;
+         function AddOrFind(const anItem : TExprBase; var added : Boolean) : Integer;
+         function Extract(const anItem : TExprBase) : Integer;
+         function ExtractAt(index : Integer) : TExprBase;
+         function IndexOf(const anItem : TExprBase) : Integer;
+         procedure Clear;
+         procedure Clean;
+         procedure Enumerate(const callback : TSimpleCallbackExprBase);
+         property Items[index : Integer] : TExprBase read GetItem; default;
+         property Count : Integer read FCount;
+   end;
+
 
 // ------------------------------------------------------------------
 // ------------------------------------------------------------------
@@ -307,6 +337,130 @@ begin
    if s <> '' then
       Result := PWideChar(Pointer(s))^
    else Result := default;
+end;
+
+// ------------------
+// ------------------ TSortedExprBaseList ------------------
+// ------------------
+
+// GetItem
+//
+function TSortedExprBaseList.GetItem(index : Integer) : TExprBase;
+begin
+   Result:=FItems[index];
+end;
+
+// Find
+//
+function TSortedExprBaseList.Find(const item : TExprBase; var index : Integer) : Boolean;
+var
+   lo, hi, mid, compResult : Integer;
+begin
+   Result:=False;
+   lo:=0;
+   hi:=FCount-1;
+   while lo<=hi do begin
+      mid:=(lo+hi) shr 1;
+      compResult:=Compare(FItems[mid], item);
+      if compResult<0 then
+         lo:=mid+1
+      else begin
+         hi:=mid- 1;
+         if compResult=0 then
+            Result:=True;
+      end;
+   end;
+   index:=lo;
+end;
+
+// InsertItem
+//
+procedure TSortedExprBaseList.InsertItem(index : Integer; const anItem : TExprBase);
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   if index<Count then
+      System.Move(FItems[index], FItems[index+1], (Count-index)*SizeOf(Pointer));
+   Inc(FCount);
+   FItems[index]:=anItem;
+end;
+
+// Add
+//
+function TSortedExprBaseList.Add(const anItem : TExprBase) : Integer;
+begin
+   Find(anItem, Result);
+   InsertItem(Result, anItem);
+end;
+
+// AddOrFind
+//
+function TSortedExprBaseList.AddOrFind(const anItem : TExprBase; var added : Boolean) : Integer;
+begin
+   added:=not Find(anItem, Result);
+   if added then
+      InsertItem(Result, anItem);
+end;
+
+// Extract
+//
+function TSortedExprBaseList.Extract(const anItem : TExprBase) : Integer;
+begin
+   if Find(anItem, Result) then
+      ExtractAt(Result)
+   else Result:=-1;
+end;
+
+// ExtractAt
+//
+function TSortedExprBaseList.ExtractAt(index : Integer) : TExprBase;
+var
+   n : Integer;
+begin
+   Dec(FCount);
+   Result:=FItems[index];
+   n:=FCount-index;
+   if n>0 then
+      System.Move(FItems[index+1], FItems[index], n*SizeOf(TExprBase));
+   SetLength(FItems, FCount);
+end;
+
+// IndexOf
+//
+function TSortedExprBaseList.IndexOf(const anItem : TExprBase) : Integer;
+begin
+   if not Find(anItem, Result) then
+      Result:=-1;
+end;
+
+// Clear
+//
+procedure TSortedExprBaseList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+end;
+
+// Clean
+//
+procedure TSortedExprBaseList.Clean;
+var
+   i : Integer;
+begin
+   for i:=0 to FCount-1 do
+      FItems[i].Free;
+   Clear;
+end;
+
+// Enumerate
+//
+procedure TSortedExprBaseList.Enumerate(const callback : TSimpleCallbackExprBase);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callback(FItems[i])=csAbort then
+         Break;
 end;
 
 end.
