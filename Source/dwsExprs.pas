@@ -607,9 +607,16 @@ type
       Value : Variant;
    end;
 
+   TSimpleHashBucketCustomState = record
+      HashCode : Cardinal;
+      Value : TdwsCustomState;
+   end;
+
+   TSimpleHashFuncCustomState = function (const item : TdwsCustomState) : TSimpleHashAction of object;
+
    TdwsCustomStates = class
       private
-         FBuckets : array of TSimpleHashBucket<TdwsCustomState>;
+         FBuckets : array of TSimpleHashBucketCustomState;
          FCount : Integer;
          FGrowth : Integer;
          FCapacity : Integer;
@@ -631,7 +638,7 @@ type
          function Remove(const anItem : TdwsCustomState) : Boolean; // true if removed
          function Contains(const anItem : TdwsCustomState) : Boolean;
          function Match(var anItem : TdwsCustomState) : Boolean;
-         procedure Enumerate(callBack : TSimpleHashFunc<TdwsCustomState>);
+         procedure Enumerate(callBack : TSimpleHashFuncCustomState);
          procedure Clear;
 
          function IntegerStateDef(const index : TGUID; const default : Integer) : Integer;
@@ -648,9 +655,16 @@ type
       Value : IInterface;
    end;
 
+   TSimpleHashBucketCustomInterface = record
+      HashCode : Cardinal;
+      Value : TdwsCustomInterface;
+   end;
+
+   TSimpleHashFuncCustomInterface = function (const item : TdwsCustomInterface) : TSimpleHashAction of object;
+
    TdwsCustomInterfaces = class
       private
-         FBuckets : array of TSimpleHashBucket<TdwsCustomInterface>;
+         FBuckets : array of TSimpleHashBucketCustomInterface;
          FCount : Integer;
          FGrowth : Integer;
          FCapacity : Integer;
@@ -671,7 +685,7 @@ type
          function Remove(const anItem : TdwsCustomInterface) : Boolean; // true if removed
          function Contains(const anItem : TdwsCustomInterface) : Boolean;
          function Match(var anItem : TdwsCustomInterface) : Boolean;
-         procedure Enumerate(callBack : TSimpleHashFunc<TdwsCustomInterface>);
+         procedure Enumerate(callBack : TSimpleHashFuncCustomInterface);
          procedure Clear;
 
          property Count : Integer read FCount;
@@ -9567,8 +9581,7 @@ end;
 procedure TdwsCustomStates.Grow;
 var
    i, j, n : Integer;
-   hashCode : Integer;
-   oldBuckets : array of TSimpleHashBucket<TdwsCustomState>;
+   oldBuckets : array of TSimpleHashBucketCustomState;
 begin
    if FCapacity=0 then
       FCapacity:=32
@@ -9630,6 +9643,7 @@ var
    i : Integer;
    hashCode : Integer;
 begin
+   Result:=False;
    if FCount>=FGrowth then Grow;
 
    hashCode:=GetItemHashCode(anItem);
@@ -9691,7 +9705,7 @@ end;
 
 // Enumerate
 //
-procedure TdwsCustomStates.Enumerate(callBack : TSimpleHashFunc<TdwsCustomState>);
+procedure TdwsCustomStates.Enumerate(callBack : TSimpleHashFuncCustomState);
 var
    i : Integer;
 begin
@@ -9803,12 +9817,12 @@ end;
 procedure TdwsCustomInterfaces.Grow;
 var
    i, j, n : Integer;
-   hashCode : Integer;
-   oldBuckets : array of TSimpleHashBucket<TdwsCustomInterface>;
+   oldBuckets : array of TSimpleHashBucketCustomInterface;
 begin
    if FCapacity=0 then
       FCapacity:=32
-   else FCapacity:=FCapacity*2;
+   else
+     FCapacity:=FCapacity*2;
    FGrowth:=(FCapacity*11) div 16;
 
    SetLength(oldBuckets, Length(FBuckets));
@@ -9866,6 +9880,7 @@ var
    i : Integer;
    hashCode : Integer;
 begin
+   Result:=False;
    if FCount>=FGrowth then Grow;
 
    hashCode:=GetItemHashCode(anItem);
@@ -9927,7 +9942,7 @@ end;
 
 // Enumerate
 //
-procedure TdwsCustomInterfaces.Enumerate(callBack : TSimpleHashFunc<TdwsCustomInterface>);
+procedure TdwsCustomInterfaces.Enumerate(callBack : TSimpleHashFuncCustomInterface);
 var
    i : Integer;
 begin

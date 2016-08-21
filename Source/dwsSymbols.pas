@@ -209,6 +209,28 @@ type
          procedure RaiseObjectAlreadyDestroyed(exec : TdwsExecution);
    end;
 
+   TSimpleStackExprBase = class
+      type
+        TArrayOfExprBase = array of TExprBase;
+      private
+         FItems : TArrayOfExprBase;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : TExprBase; inline;
+         procedure SetPeek(const item : TExprBase);
+         function GetItems(const position : Integer) : TExprBase;
+         procedure SetItems(const position : Integer; const value : TExprBase);
+      public
+         procedure Push(const item : TExprBase);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : TExprBase read GetPeek write SetPeek;
+         property Items[const position : Integer] : TExprBase read GetItems write SetItems;
+         property Count : Integer read FCount;
+   end;
+
    // All functions callable from the script implement this interface
    IExecutable = interface (IGetSelf)
       ['{8D534D18-4C6B-11D5-8DCB-0000216D9E86}']
@@ -424,9 +446,38 @@ type
          function GetEnumerator : TSymbolTableEnumerator;
    end;
 
+   TSimpleStackSymbolTable = class
+      type
+        TArrayOfSymbolTable = array of TSymbolTable;
+      private
+         FItems : TArrayOfSymbolTable;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : TSymbolTable; inline;
+         procedure SetPeek(const item : TSymbolTable);
+         function GetItems(const position : Integer) : TSymbolTable;
+         procedure SetItems(const position : Integer; const value : TSymbolTable);
+      public
+         procedure Push(const item : TSymbolTable);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : TSymbolTable read GetPeek write SetPeek;
+         property Items[const position : Integer] : TSymbolTable read GetItems write SetItems;
+         property Count : Integer read FCount;
+   end;
+
+   TSimpleHashBucketSymbolTable = record
+      HashCode : Cardinal;
+      Value : TSymbolTable;
+   end;
+
+   TSimpleHashFunc<T> = function (const item : T) : TSimpleHashAction of object;
+
    TSimpleSymbolTableHash = class
       private
-         FBuckets : array of TSimpleHashBucket<TSymbolTable>;
+         FBuckets : array of TSimpleHashBucketSymbolTable;
          FCount : Integer;
          FGrowth : Integer;
          FCapacity : Integer;
@@ -1554,9 +1605,16 @@ type
       VMT : TMethodSymbolArray;
    end;
 
+   TSimpleHashBucketResolvedInterface = record
+      HashCode : Cardinal;
+      Value : TResolvedInterface;
+   end;
+
+   TSimpleHashFuncResolvedInterface = function (const item : TResolvedInterface) : TSimpleHashAction of object;
+
    TResolvedInterfaces = class
       private
-         FBuckets : array of TSimpleHashBucket<TResolvedInterface>;
+         FBuckets : array of TSimpleHashBucketResolvedInterface;
          FCount : Integer;
          FGrowth : Integer;
          FCapacity : Integer;
@@ -1573,7 +1631,7 @@ type
          function Remove(const anItem : TResolvedInterface) : Boolean; // true if removed
          function Contains(const anItem : TResolvedInterface) : Boolean;
          function Match(var anItem : TResolvedInterface) : Boolean;
-         procedure Enumerate(callBack : TSimpleHashFunc<TResolvedInterface>);
+         procedure Enumerate(callBack : TSimpleHashFuncResolvedInterface);
          procedure Clear;
 
          property Count : Integer read FCount;
@@ -2116,10 +2174,10 @@ var
    i : Integer;
    abort : Boolean;
    base, expr : TExprBase;
-   stack : TSimpleStack<TExprBase>;
+   stack : TSimpleStackExprBase;
 begin
    if Self=nil then Exit(False);
-   stack:=TSimpleStack<TExprBase>.Create;
+   stack:=TSimpleStackExprBase.Create;
    try
       abort:=False;
       stack.Push(Self);
@@ -2284,6 +2342,71 @@ end;
 function TExprBase.FuncSymQualifiedName : UnicodeString;
 begin
    Result:='';
+end;
+
+// ------------------
+// ------------------ TSimpleStackExprBase ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackExprBase.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackExprBase.Push(const item : TExprBase);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackExprBase.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackExprBase.GetPeek : TExprBase;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackExprBase.SetPeek(const item : TExprBase);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackExprBase.GetItems(const position : Integer) : TExprBase;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackExprBase.SetItems(const position : Integer; const value : TExprBase);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackExprBase.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
 end;
 
 // ------------------
@@ -5787,11 +5910,11 @@ function TSymbolTable.EnumerateSymbolsOfNameInScope(const aName : UnicodeString;
 var
    i : Integer;
    visitedTables : TSimpleSymbolTableHash;
-   tableStack : TSimpleStack<TSymbolTable>;
+   tableStack : TSimpleStackSymbolTable;
    current : TSymbolTable;
 begin
    visitedTables:=TSimpleSymbolTableHash.Create;
-   tableStack:=TSimpleStack<TSymbolTable>.Create;
+   tableStack:=TSimpleStackSymbolTable.Create;
    try
       tableStack.Push(Self);
       while tableStack.Count>0 do begin
@@ -6173,6 +6296,71 @@ begin
 end;
 
 // ------------------
+// ------------------ TSimpleStackSymbolTable ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackSymbolTable.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackSymbolTable.Push(const item : TSymbolTable);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackSymbolTable.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackSymbolTable.GetPeek : TSymbolTable;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackSymbolTable.SetPeek(const item : TSymbolTable);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackSymbolTable.GetItems(const position : Integer) : TSymbolTable;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackSymbolTable.SetItems(const position : Integer; const value : TSymbolTable);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackSymbolTable.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
+end;
+
+// ------------------
 // ------------------ TSimpleSymbolTableHash ------------------
 // ------------------
 
@@ -6181,8 +6369,7 @@ end;
 procedure TSimpleSymbolTableHash.Grow;
 var
    i, j, n : Integer;
-   hashCode : Integer;
-   oldBuckets : array of TSimpleHashBucket<TSymbolTable>;
+   oldBuckets : array of TSimpleHashBucketSymbolTable;
 begin
    if FCapacity=0 then
       FCapacity:=32
@@ -6244,6 +6431,7 @@ var
    i : Integer;
    hashCode : Integer;
 begin
+   Result:=False;
    if FCount>=FGrowth then Grow;
 
    hashCode:=GetItemHashCode(anItem);
@@ -7769,8 +7957,7 @@ end;
 procedure TResolvedInterfaces.Grow;
 var
    i, j, n : Integer;
-   hashCode : Integer;
-   oldBuckets : array of TSimpleHashBucket<TResolvedInterface>;
+   oldBuckets : array of TSimpleHashBucketResolvedInterface;
 begin
    if FCapacity=0 then
       FCapacity:=32
@@ -7832,6 +8019,7 @@ var
    i : Integer;
    hashCode : Integer;
 begin
+   Result:=False;
    if FCount>=FGrowth then Grow;
 
    hashCode:=GetItemHashCode(anItem);
@@ -7893,7 +8081,7 @@ end;
 
 // Enumerate
 //
-procedure TResolvedInterfaces.Enumerate(callBack : TSimpleHashFunc<TResolvedInterface>);
+procedure TResolvedInterfaces.Enumerate(callBack : TSimpleHashFuncResolvedInterface);
 var
    i : Integer;
 begin

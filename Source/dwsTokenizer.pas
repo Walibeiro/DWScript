@@ -248,6 +248,28 @@ type
 
    TTokenizerEndSourceFileEvent = procedure (sourceFile : TSourceFile) of object;
 
+   TSimpleStackTokenizerConditionalInfo = class
+      type
+         TArrayOfTokenizerConditionalInfo = array of TTokenizerConditionalInfo;
+      private
+         FItems : TArrayOfTokenizerConditionalInfo;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : TTokenizerConditionalInfo; inline;
+         procedure SetPeek(const item : TTokenizerConditionalInfo);
+         function GetItems(const position : Integer) : TTokenizerConditionalInfo;
+         procedure SetItems(const position : Integer; const value : TTokenizerConditionalInfo);
+      public
+         procedure Push(const item : TTokenizerConditionalInfo);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : TTokenizerConditionalInfo read GetPeek write SetPeek;
+         property Items[const position : Integer] : TTokenizerConditionalInfo read GetItems write SetItems;
+         property Count : Integer read FCount;
+   end;
+
    TTokenizer = class
       private
          FTokenBuf : TTokenBuffer;
@@ -260,7 +282,7 @@ type
          FSwitchProcessor : TSwitchHandler;
          FMsgs : TdwsCompileMessageList;
          FConditionalDefines : IAutoStrings;
-         FConditionalDepth : TSimpleStack<TTokenizerConditionalInfo>;
+         FConditionalDepth : TSimpleStackTokenizerConditionalInfo;
 
          FTokenPool : TToken;
 
@@ -319,7 +341,7 @@ type
 
          function SafePathName : String; inline;
 
-         property ConditionalDepth : TSimpleStack<TTokenizerConditionalInfo> read FConditionalDepth;
+         property ConditionalDepth : TSimpleStackTokenizerConditionalInfo read FConditionalDepth;
          property Rules : TTokenizerRules read FRules;
 
          property SwitchHandler : TSwitchHandler read FSwitchHandler write FSwitchHandler;
@@ -1073,6 +1095,71 @@ begin
 end;
 
 // ------------------
+// ------------------ TSimpleStackTokenizerConditionalInfo ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackTokenizerConditionalInfo.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackTokenizerConditionalInfo.Push(const item : TTokenizerConditionalInfo);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackTokenizerConditionalInfo.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackTokenizerConditionalInfo.GetPeek : TTokenizerConditionalInfo;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackTokenizerConditionalInfo.SetPeek(const item : TTokenizerConditionalInfo);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackTokenizerConditionalInfo.GetItems(const position : Integer) : TTokenizerConditionalInfo;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackTokenizerConditionalInfo.SetItems(const position : Integer; const value : TTokenizerConditionalInfo);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackTokenizerConditionalInfo.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
+end;
+
+// ------------------
 // ------------------ TTokenizer ------------------
 // ------------------
 
@@ -1086,7 +1173,7 @@ begin
    FStartState := FRules.StartState;
    FTokenBuf.CaseSensitive := rules.CaseSensitive;
 
-   FConditionalDepth:=TSimpleStack<TTokenizerConditionalInfo>.Create;
+   FConditionalDepth := TSimpleStackTokenizerConditionalInfo.Create;
 end;
 
 // Destroy

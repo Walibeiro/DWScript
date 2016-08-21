@@ -32,7 +32,7 @@
 program DWSWebServer;
 
 {$IFNDEF VER200} // delphi 2009
-   {$WEAKLINKRTTI ON}
+   {$WEAKLINKRTTI ON}
    {$RTTI EXPLICIT METHODS([]) PROPERTIES([]) FIELDS([])}
 {$ENDIF}
 
@@ -265,9 +265,9 @@ begin
             Readln;
 
          end;
-      except
-         on E: Exception do
-            LogServiceError(options, E);
+      except
+         on E: Exception do
+            LogServiceError(options, E);
       end;
    finally
       try

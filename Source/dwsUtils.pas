@@ -335,7 +335,6 @@ type
          property Items[index : Integer] : T read GetItem; default;
          property Count : Integer read FCount;
    end;
-*)
 
    // TSimpleStack<T>
    //
@@ -363,6 +362,7 @@ type
          property Items[const position : Integer] : T read GetItems write SetItems;
          property Count : Integer read FCount;
    end;
+*)
 
    // TSimpleStackBoolean
    //
@@ -451,15 +451,16 @@ type
          property Count : Integer read FCount;
    end;
 
+   TSimpleHashAction = (shaNone, shaRemove);
+
+(*
    TSimpleHashBucket<T> = record
       HashCode : Cardinal;
       Value : T;
    end;
    TSimpleHashBucketArray<T> = array of TSimpleHashBucket<T>;
-   TSimpleHashAction = (shaNone, shaRemove);
    TSimpleHashFunc<T> = function (const item : T) : TSimpleHashAction of object;
 
-(*
    {: Minimalistic open-addressing hash, subclasses must override SameItem and GetItemHashCode.
       HashCodes *MUST* be non zero }
    TSimpleHash<T> = class
@@ -494,9 +495,16 @@ type
    end;
 *)
 
+   TSimpleHashBucketRefCountedObject = record
+      HashCode : Cardinal;
+      Value : TRefCountedObject;
+   end;
+
+   TSimpleHashFuncRefCountedObject = function (const item : TRefCountedObject) : TSimpleHashAction of object;
+
    TSimpleObjectHash = class
       private
-         FBuckets : array of TSimpleHashBucket<TRefCountedObject>;
+         FBuckets : array of TSimpleHashBucketRefCountedObject;
          FCount : Integer;
          FGrowth : Integer;
          FCapacity : Integer;
@@ -513,7 +521,7 @@ type
          function Remove(const anItem : TRefCountedObject) : Boolean; // true if removed
          function Contains(const anItem : TRefCountedObject) : Boolean;
          function Match(var anItem : TRefCountedObject) : Boolean;
-         procedure Enumerate(callBack : TSimpleHashFunc<TRefCountedObject>);
+         procedure Enumerate(callBack : TSimpleHashFuncRefCountedObject);
          procedure Clear;
          procedure Clean;
 
@@ -581,6 +589,7 @@ type
 
    TSimpleRefCountedObjectHash = class (TSimpleObjectHash);
 
+(*
    TSimpleNameObjectHash<T{$IFNDEF FPC}: class{$ENDIF}> = class
       private
          FHash : TNameObjectHash;
@@ -653,15 +662,22 @@ type
       Name : String;
       Value : T;
    end;
+*)
 
    TNameValueHashBucketInteger = record
       Name : String;
       Value : Integer;
    end;
 
+   TSimpleHashBucketNameValueInteger = record
+      HashCode : Cardinal;
+      Value : TNameValueHashBucketInteger;
+   end;
+   TSimpleHashFuncNameValueHashBucketInteger = function (const item : TNameValueHashBucketInteger) : TSimpleHashAction of object;
+
    TCaseInsensitiveNameValueHashInteger = class
       private
-         FBuckets : array of TSimpleHashBucket<TNameValueHashBucketInteger>;
+         FBuckets : array of TSimpleHashBucketNameValueInteger;
          FCount : Integer;
          FGrowth : Integer;
          FCapacity : Integer;
@@ -678,7 +694,7 @@ type
          function Remove(const anItem : TNameValueHashBucketInteger) : Boolean; // true if removed
          function Contains(const anItem : TNameValueHashBucketInteger) : Boolean;
          function Match(var anItem : TNameValueHashBucketInteger) : Boolean;
-         procedure Enumerate(callBack : TSimpleHashFunc<TNameValueHashBucketInteger>);
+         procedure Enumerate(callBack : TSimpleHashFuncNameValueHashBucketInteger);
          procedure Clear;
 
          property Count : Integer read FCount;
@@ -747,6 +763,7 @@ type
 
    TSimpleCallback<T> = function (var item : T) : TSimpleCallbackStatus;
 
+(*
    TThreadCached<T> = class
       private
          FLock : TMultiReadSingleWrite;
@@ -810,6 +827,7 @@ type
 
          property Count : Integer read FCount;
    end;
+*)
 
 const
    cWriteOnlyBlockStreamBlockSize = $2000 - 2*SizeOf(Pointer);
@@ -928,9 +946,16 @@ type
          function Sum : Double;
    end;
 
+   TSimpleHashBucketString = record
+      HashCode : Cardinal;
+      Value : String;
+   end;
+
+   TSimpleHashStringFunc = function (const item : String) : TSimpleHashAction of object;
+
    TSimpleStringHash = class
       private
-         FBuckets : array of TSimpleHashBucket<String>;
+         FBuckets : array of TSimpleHashBucketString;
          FCount : Integer;
          FGrowth : Integer;
          FCapacity : Integer;
@@ -947,7 +972,7 @@ type
          function Remove(const anItem : String) : Boolean; // true if removed
          function Contains(const anItem : String) : Boolean;
          function Match(var anItem : String) : Boolean;
-         procedure Enumerate(callBack : TSimpleHashFunc<String>);
+         procedure Enumerate(callBack : TSimpleHashStringFunc);
          procedure Clear;
 
          property Count : Integer read FCount;
@@ -3831,7 +3856,6 @@ begin
       if callback(FItems[i])=csAbort then
          Break;
 end;
-*)
 
 // ------------------
 // ------------------ TSimpleStack<T> ------------------
@@ -3897,6 +3921,7 @@ begin
    FCount:=0;
    FCapacity:=0;
 end;
+*)
 
 // ------------------
 // ------------------ TSimpleStackString ------------------
@@ -4736,8 +4761,7 @@ end;
 procedure TSimpleObjectHash.Grow;
 var
    i, j, n : Integer;
-   hashCode : Integer;
-   oldBuckets : array of TSimpleHashBucket<TRefCountedObject>;
+   oldBuckets : array of TSimpleHashBucketRefCountedObject;
 begin
    if FCapacity=0 then
       FCapacity:=32
@@ -4799,6 +4823,7 @@ var
    i : Integer;
    hashCode : Integer;
 begin
+   Result:=False;
    if FCount>=FGrowth then Grow;
 
    hashCode:=GetItemHashCode(anItem);
@@ -4860,7 +4885,7 @@ end;
 
 // Enumerate
 //
-procedure TSimpleObjectHash.Enumerate(callBack : TSimpleHashFunc<TRefCountedObject>);
+procedure TSimpleObjectHash.Enumerate(callBack : TSimpleHashFuncRefCountedObject);
 var
    i : Integer;
 begin
@@ -5502,6 +5527,7 @@ begin
    FBuckets[index].Obj:=obj;
 end;
 
+(*
 // ------------------
 // ------------------ TSimpleNameObjectHash<T> ------------------
 // ------------------
@@ -5604,6 +5630,7 @@ function TSimpleNameObjectHash<T>.HighIndex : Integer;
 begin
    Result:=FHash.HighIndex;
 end;
+*)
 
 // ------------------
 // ------------------ TRefCountedObject ------------------
@@ -5676,6 +5703,7 @@ begin
    p^:=n;
 end;
 
+(*
 // ------------------
 // ------------------ TSimpleObjectObjectHash<T1, T2> ------------------
 // ------------------
@@ -5876,6 +5904,7 @@ begin
       FLock.EndWrite;
    end;
 end;
+*)
 
 // ------------------
 // ------------------ TSimpleIntegerStack ------------------
@@ -6414,8 +6443,7 @@ end;
 procedure TCaseInsensitiveNameValueHashInteger.Grow;
 var
    i, j, n : Integer;
-   hashCode : Integer;
-   oldBuckets : array of TSimpleHashBucket<TNameValueHashBucketInteger>;
+   oldBuckets : array of TSimpleHashBucketNameValueInteger;
 begin
    if FCapacity=0 then
       FCapacity:=32
@@ -6477,6 +6505,7 @@ var
    i : Integer;
    hashCode : Integer;
 begin
+   Result:=False;
    if FCount>=FGrowth then Grow;
 
    hashCode:=GetItemHashCode(anItem);
@@ -6538,7 +6567,7 @@ end;
 
 // Enumerate
 //
-procedure TCaseInsensitiveNameValueHashInteger.Enumerate(callBack : TSimpleHashFunc<TNameValueHashBucketInteger>);
+procedure TCaseInsensitiveNameValueHashInteger.Enumerate(callBack : TSimpleHashFuncNameValueHashBucketInteger);
 var
    i : Integer;
 begin
@@ -6587,8 +6616,7 @@ end;
 procedure TSimpleStringHash.Grow;
 var
    i, j, n : Integer;
-   hashCode : Integer;
-   oldBuckets : array of TSimpleHashBucket<String>;
+   oldBuckets : array of TSimpleHashBucketString;
 begin
    if FCapacity=0 then
       FCapacity:=32
@@ -6650,6 +6678,7 @@ var
    i : Integer;
    hashCode : Integer;
 begin
+   Result:=False;
    if FCount>=FGrowth then Grow;
 
    hashCode:=GetItemHashCode(anItem);
@@ -6711,7 +6740,7 @@ end;
 
 // Enumerate
 //
-procedure TSimpleStringHash.Enumerate(callBack : TSimpleHashFunc<String>);
+procedure TSimpleStringHash.Enumerate(callBack : TSimpleHashStringFunc);
 var
    i : Integer;
 begin

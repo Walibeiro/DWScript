@@ -14,30 +14,68 @@ uses
   Windows,
   Classes,
   SysUtils,
-  dwsXPlatform,
-  dwsComp,
-  dwsCompiler,
-  dwsExprs,
-  dwsUtils,
-  dwsFunctions,
-  SynZip,
-  dwsMathFunctions,
-  dwsStringFunctions,
-  dwsTimeFunctions,
-  dwsVariantFunctions,
-  dwsFileFunctions,
-  dwsBigIntegerFunctions.GMP,
-  dwsMPIR.Bundle,
-  dwsClassesLibModule,
-  dwsZipLibModule,
-  dwsEncodingLibModule,
-  dwsCryptoLibModule,
-  dwsWebLibModule,
-  dwsDatabaseLibModule,
-  dwsComConnector,
-  dwsJSONConnector,
-  dwsSynSQLiteDatabase,
-  dwsRunnerProject in 'dwsRunnerProject.pas';
+  dwsXPlatform in '..\..\Source\dwsXPlatform.pas',
+  dwsComp in '..\..\Source\dwsComp.pas',
+  dwsCompiler in '..\..\Source\dwsCompiler.pas',
+  dwsExprs in '..\..\Source\dwsExprs.pas',
+  dwsUtils in '..\..\Source\dwsUtils.pas',
+  dwsFunctions in '..\..\Source\dwsFunctions.pas',
+  dwsStrings in '..\..\Source\dwsStrings.pas',
+  dwsErrors in '..\..\Source\dwsErrors.pas',
+  dwsSymbols in '..\..\Source\dwsSymbols.pas',
+  dwsJSON in '..\..\Source\dwsJSON.pas',
+  dwsDateTime in '..\..\Source\dwsDateTime.pas',
+  dwsTokenizer in '..\..\Source\dwsTokenizer.pas',
+  dwsStack in '..\..\Source\dwsStack.pas',
+  dwsDataContext in '..\..\Source\dwsDataContext.pas',
+  dwsExprList in '..\..\Source\dwsExprList.pas',
+  dwsUnitSymbols in '..\..\Source\dwsUnitSymbols.pas',
+  dwsOperators in '..\..\Source\dwsOperators.pas',
+  dwsCoreExprs in '..\..\Source\dwsCoreExprs.pas',
+  dwsConvExprs in '..\..\Source\dwsConvExprs.pas',
+  dwsConstExprs in '..\..\Source\dwsConstExprs.pas',
+  dwsCompilerUtils in '..\..\Source\dwsCompilerUtils.pas',
+  dwsMethodExprs in '..\..\Source\dwsMethodExprs.pas',
+  dwsMagicExprs in '..\..\Source\dwsMagicExprs.pas',
+  dwsExternalSymbols in '..\..\Source\dwsExternalSymbols.pas',
+  dwsInfo in '..\..\Source\dwsInfo.pas',
+  dwsConnectorSymbols in '..\..\Source\dwsConnectorSymbols.pas',
+  dwsConnectorExprs in '..\..\Source\dwsConnectorExprs.pas',
+  dwsResultFunctions in '..\..\Source\dwsResultFunctions.pas',
+  dwsRelExprs in '..\..\Source\dwsRelExprs.pas',
+  dwsSetOfExprs in '..\..\Source\dwsSetOfExprs.pas',
+  dwsPascalTokenizer in '..\..\Source\dwsPascalTokenizer.pas',
+  dwsSystemOperators in '..\..\Source\dwsSystemOperators.pas',
+  dwsLanguageExtension in '..\..\Source\dwsLanguageExtension.pas',
+  dwsMathFunctions in '..\..\Source\dwsMathFunctions.pas',
+  dwsStringFunctions in '..\..\Source\dwsStringFunctions.pas',
+  dwsTimeFunctions in '..\..\Source\dwsTimeFunctions.pas',
+  dwsVariantFunctions in '..\..\Source\dwsVariantFunctions.pas',
+  dwsFileFunctions in '..\..\Source\dwsFileFunctions.pas',
+  dwsFileSystem in '..\..\Source\dwsFileSystem.pas',
+  dwsEncoding in '..\..\Source\dwsEncoding.pas',
+  dwsWebUtils in '..\..\Source\dwsWebUtils.pas',
+  dwsWebServerUtils in '..\..\Source\dwsWebServerUtils.pas',
+  dwsClasses in '..\..\Libraries\ClassesLib\dwsClasses.pas',
+  dwsClassesLibModule in '..\..\Libraries\ClassesLib\dwsClassesLibModule.pas',
+  dwsHashtables in '..\..\Libraries\ClassesLib\dwsHashtables.pas',
+  dwsZipLibModule in '..\..\Libraries\ClassesLib\dwsZipLibModule.pas',
+  dwsEncodingLibModule in '..\..\Libraries\ClassesLib\dwsEncodingLibModule.pas',
+(*
+  dwsBigIntegerFunctions.GMP in '..\..\Libraries\BigIntegersLib\dwsBigIntegerFunctions.pas',
+  dwsMPIR.Bundle in '..\..\Libraries\BigIntegersLib\dwsMPIR.pas',
+  dwsCryptoLibModule in '..\..\Libraries\CryptoLib\dwsCryptoLibModule.pas',
+  dwsCryptoXPlatform in '..\..\Source\dwsCryptoXPlatform.pas',
+  dwsTokenStore in '..\..\Libraries\CryptoLib\dwsTokenStore.pas',
+  dwsWebLibModule in '..\..\Libraries\SimpleServer\dwsWebLibModule.pas',
+  dwsDatabaseLibModule in '..\..\Libraries\DatabaseLib\dwsDatabaseLibModule.pas',
+  dwsDatabase in '..\..\Libraries\DatabaseLib\dwsDatabase.pas',
+  dwsSynSQLiteDatabase in '..\..\Libraries\dwsSynSQLiteDatabase.pas',
+*)
+  dwsComConnector in '..\..\Source\dwsComConnector.pas',
+  dwsJSONConnector in '..\..\Source\dwsJSONConnector.pas',
+  dwsRunnerProject in 'dwsRunnerProject.pas',
+  SynZip;
 
 {$SetPEFlags IMAGE_FILE_LARGE_ADDRESS_AWARE or IMAGE_FILE_RELOCS_STRIPPED}
 
@@ -49,10 +87,12 @@ begin
    TdwsJSONLibModule.Create(Result).Script:=Result;
    TdwsClassesLib.Create(Result).dwsUnit.Script:=Result;
    TdwsEncodingLib.Create(Result).dwsEncoding.Script:=Result;
+(*
    TdwsCryptoLib.Create(Result).dwsCrypto.Script:=Result;
-   TdwsZipLib.Create(Result).dwsZip.Script:=Result;
-   TdwsWebLib.Create(Result).dwsWeb.Script:=Result;
    TdwsDatabaseLib.Create(Result).dwsDatabase.Script:=Result;
+   TdwsWebLib.Create(Result).dwsWeb.Script:=Result;
+*)
+   TdwsZipLib.Create(Result).dwsZip.Script:=Result;
 end;
 
 procedure WriteHeader;

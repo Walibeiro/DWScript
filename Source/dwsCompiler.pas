@@ -504,9 +504,39 @@ type
          property Count : Integer read FCount;
    end;
 
+   TSimpleObjectObjectHash_TDataSymbol_TVarExpr = class
+      type
+         TObjectObjectHashBucket = record
+            HashCode : Cardinal;
+            Name : UnicodeString;
+            Key : TDataSymbol;
+            Value : TVarExpr;
+         end;
+         TObjectObjectHashBuckets = array of TObjectObjectHashBucket;
+
+      private
+         FBuckets : TObjectObjectHashBuckets;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function GetItemHashCode(const item1 : TObjectObjectHashBucket) : Integer;
+         function LinearFind(const item : TObjectObjectHashBucket; var index : Integer) : Boolean;
+         function Match(var anItem : TObjectObjectHashBucket) : Boolean;
+         function Replace(const anItem : TObjectObjectHashBucket) : Boolean; // true if added
+
+      public
+         function  GetValue(aKey : TDataSymbol) : TVarExpr;
+         procedure SetValue(aKey : TDataSymbol; aValue : TVarExpr);
+         procedure Clear;
+
+         procedure CleanValues;
+   end;
+
    // TdwsCompiler
    //
-   TSimpleObjectObjectHash_TDataSymbol_TVarExpr = TSimpleObjectObjectHash<TDataSymbol,TVarExpr>;
    TdwsCompiler = class (TInterfacedObject, IdwsCompiler)
       private
          FOptions : TCompilerOptions;
@@ -1479,6 +1509,141 @@ begin
    SetLength(FItems, 0);
    FCount:=0;
    FCapacity:=0;
+end;
+
+// ------------------
+// ------------------ TSimpleObjectObjectHash_TDataSymbol_TVarExpr ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleObjectObjectHash_TDataSymbol_TVarExpr.Grow;
+var
+   i, j, n : Integer;
+   hashCode : Integer;
+   oldBuckets : TObjectObjectHashBuckets;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*3) div 4;
+
+   oldBuckets:=FBuckets;
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// GetItemHashCode
+//
+function TSimpleObjectObjectHash_TDataSymbol_TVarExpr.GetItemHashCode(const item1 : TObjectObjectHashBucket) : Integer;
+begin
+   Result:=(PNativeInt(@item1.Key)^ shr 2);
+end;
+
+// GetValue
+//
+function TSimpleObjectObjectHash_TDataSymbol_TVarExpr.GetValue(aKey : TDataSymbol) : TVarExpr;
+var
+   bucket : TObjectObjectHashBucket;
+begin
+   bucket.Key:=aKey;
+   if Match(bucket) then
+      Result:=bucket.Value
+   {$ifdef VER200}
+   else Result:=default(TValue); // D2009 support
+   {$else}
+   else Result:=TVarExpr(TObject(nil));  // workaround for D2010 compiler bug
+   {$endif}
+end;
+
+// SetValue
+//
+procedure TSimpleObjectObjectHash_TDataSymbol_TVarExpr.SetValue(aKey : TDataSymbol; aValue : TVarExpr);
+var
+   bucket : TObjectObjectHashBucket;
+begin
+   bucket.Key:=aKey;
+   bucket.Value:=aValue;
+   Replace(bucket);
+end;
+
+// LinearFind
+//
+function TSimpleObjectObjectHash_TDataSymbol_TVarExpr.LinearFind(const item : TObjectObjectHashBucket; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if item.Key=FBuckets[index].Key then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Match
+//
+function TSimpleObjectObjectHash_TDataSymbol_TVarExpr.Match(var anItem : TObjectObjectHashBucket) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i];
+end;
+
+// Replace
+//
+function TSimpleObjectObjectHash_TDataSymbol_TVarExpr.Replace(const anItem : TObjectObjectHashBucket) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i]:=anItem
+   end else begin
+      FBuckets[i]:=anItem;
+      FBuckets[i].HashCode:=hashCode;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// CleanValues
+//
+procedure TSimpleObjectObjectHash_TDataSymbol_TVarExpr.CleanValues;
+var
+   i : Integer;
+begin
+   for i:=0 to FCapacity-1 do begin
+      if FBuckets[i].HashCode<>0 then
+         FBuckets[i].Value.Free;
+   end;
+   Clear;
+end;
+
+// Clear
+//
+procedure TSimpleObjectObjectHash_TDataSymbol_TVarExpr.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   SetLength(FBuckets, 0);
 end;
 
 // ------------------
