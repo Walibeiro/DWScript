@@ -199,13 +199,12 @@ type
    //
    {: A minimalistic generic list class. }
    TSimpleList<T> = class
+      type
+         ArrayT = array of T;
       private
-         type
-            ArrayT = array of T;
-         var
-            FItems : ArrayT;
-            FCount : Integer;
-            FCapacity : Integer;
+          FItems : ArrayT;
+          FCount : Integer;
+          FCapacity : Integer;
 
       protected
          procedure Grow;
@@ -761,9 +760,9 @@ type
          procedure Clear;
    end;
 
+(*
    TSimpleCallback<T> = function (var item : T) : TSimpleCallbackStatus;
 
-(*
    TThreadCached<T> = class
       private
          FLock : TMultiReadSingleWrite;
@@ -6104,6 +6103,7 @@ begin
    end;
 end;
 
+(*
 // ------------------
 // ------------------ TSimpleQueue<T> ------------------
 // ------------------
@@ -6256,6 +6256,7 @@ begin
    FFirst:=nil;
    FLast:=nil;
 end;
+*)
 
 // ------------------
 // ------------------ EdwsVariantTypeCastError ------------------

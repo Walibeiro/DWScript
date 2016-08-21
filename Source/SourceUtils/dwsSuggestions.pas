@@ -66,13 +66,30 @@ type
 
    TProcAddToList = procedure (aList : TSimpleSymbolList) of object;
 
-   TSimpleSymbolList = class(TSimpleList<TSymbol>)
+   TSimpleCallbackSymbol = function (var item : TSymbol) : TSimpleCallbackStatus;
+
+   TSimpleSymbolList = class
+      type
+         TArrayOfSymbol = array of TSymbol;
+      private
+          FItems : TArrayOfSymbol;
+          FCount : Integer;
+          FCapacity : Integer;
+
       protected
+         procedure Grow;
+         function GetItems(const idx : Integer) : TSymbol; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItems(const idx : Integer; const value : TSymbol);
          function ScopeStruct(symbol : TSymbol) : TCompositeTypeSymbol;
          // min visibility of struct members when seen from scope
          function ScopeVisiblity(scope, struct : TCompositeTypeSymbol) : TdwsVisibility;
 
       public
+         procedure Add(const item : TSymbol);
+         procedure Extract(idx : Integer);
+         procedure Clear;
+         procedure Enumerate(const callback : TSimpleCallbackSymbol);
+
          procedure AddSymbolTable(table : TSymbolTable);
          procedure AddDirectSymbolTable(table : TSymbolTable);
 
@@ -82,12 +99,48 @@ type
          procedure AddMetaMembers(struc : TCompositeTypeSymbol; from : TSymbol;
                                   const addToList : TProcAddToList = nil);
          procedure AddNameSpace(unitSym : TUnitSymbol);
+
+         property Items[const position : Integer] : TSymbol read GetItems write SetItems; default;
+         property Count : Integer read FCount;
    end;
 
    TdwsSuggestionsOption = (soNoReservedWords, soNoUnits);
    TdwsSuggestionsOptions = set of TdwsSuggestionsOption;
 
-   TNameSymbolHash = TSimpleNameObjectHash<TSymbol>;
+   TNameObjectHash = class(dwsUtils.TNameObjectHash);
+
+   TNameSymbolHash = class
+      private
+         FHash : TNameObjectHash;
+
+      protected
+         function GetIndex(const aName : UnicodeString) : Integer; inline;
+         function GetObjects(const aName : UnicodeString) : TSymbol; inline;
+         procedure SetObjects(const aName : UnicodeString; obj : TSymbol); inline;
+         function GetBucketObject(index : Integer) : TSymbol; inline;
+         procedure SetBucketObject(index : Integer; obj : TSymbol); inline;
+         function GetBucketName(index : Integer) : String; inline;
+
+      public
+         constructor Create(initialCapacity : Integer = 0);
+         destructor Destroy; override;
+
+         function AddObject(const aName : UnicodeString; aObj : TSymbol; replace : Boolean = False) : Boolean; inline;
+
+         procedure Clean; inline;
+         procedure Clear; inline;
+         procedure Pack; inline;
+
+         property Objects[const aName : UnicodeString] : TSymbol read GetObjects write SetObjects; default;
+
+         property BucketObject[index : Integer] : TSymbol read GetBucketObject write SetBucketObject;
+         property BucketName[index : Integer] : String read GetBucketName;
+         property BucketIndex[const aName : UnicodeString] : Integer read GetIndex;
+
+         function Count : Integer; inline;
+         function HighIndex : Integer; inline;
+   end;
+
 
    TdwsSuggestions = class (TInterfacedObject, IdwsSuggestions)
       private
@@ -174,6 +227,109 @@ begin
       List.AddMembers(helper, nil);
    List.AddMetaMembers(helper, nil);
    Result:=False;
+end;
+
+// ------------------
+// ------------------ TNameSymbolHash ------------------
+// ------------------
+
+// Create
+//
+constructor TNameSymbolHash.Create(initialCapacity : Integer = 0);
+begin
+   FHash:=TNameObjectHash.Create(initialCapacity);
+end;
+
+// Destroy
+//
+destructor TNameSymbolHash.Destroy;
+begin
+   FHash.Free;
+end;
+
+// Pack
+//
+procedure TNameSymbolHash.Pack;
+begin
+   FHash.Pack;
+end;
+
+// GetIndex
+//
+function TNameSymbolHash.GetIndex(const aName : UnicodeString) : Integer;
+begin
+   Result:=FHash.GetIndex(aName);
+end;
+
+// GetObjects
+//
+function TNameSymbolHash.GetObjects(const aName : UnicodeString) : TSymbol;
+begin
+   Result:=TSymbol(FHash.GetObjects(aName));
+end;
+
+// SetObjects
+//
+procedure TNameSymbolHash.SetObjects(const aName : UnicodeString; obj : TSymbol);
+begin
+   FHash.SetObjects(aName, obj);
+end;
+
+// AddObject
+//
+function TNameSymbolHash.AddObject(const aName : UnicodeString; aObj : TSymbol;
+   replace : Boolean = False) : Boolean;
+begin
+   Result:=FHash.AddObject(aName, aObj, replace);
+end;
+
+// Clean
+//
+procedure TNameSymbolHash.Clean;
+begin
+   FHash.Clean;
+end;
+
+// Clear
+//
+procedure TNameSymbolHash.Clear;
+begin
+   FHash.Clear;
+end;
+
+// GetBucketName
+//
+function TNameSymbolHash.GetBucketName(index : Integer) : String;
+begin
+   Result:=FHash.GetBucketName(index);
+end;
+
+// GetBucketObject
+//
+function TNameSymbolHash.GetBucketObject(index : Integer) : TSymbol;
+begin
+   Result:=TSymbol(FHash.GetBucketObject(index));
+end;
+
+// SetBucketObject
+//
+procedure TNameSymbolHash.SetBucketObject(index : Integer; obj : TSymbol);
+begin
+   FHash.SetBucketObject(index, obj);
+end;
+
+// Count
+//
+function TNameSymbolHash.Count : Integer;
+begin
+   Result:=FHash.Count;
+end;
+
+// HighIndex
+//
+function TNameSymbolHash.HighIndex : Integer;
+begin
+   Result:=FHash.HighIndex;
 end;
 
 // ------------------
@@ -951,6 +1107,72 @@ end;
 // ------------------
 // ------------------ TSimpleSymbolList ------------------
 // ------------------
+
+// Add
+//
+procedure TSimpleSymbolList.Add(const item : TSymbol);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Extract
+//
+procedure TSimpleSymbolList.Extract(idx : Integer);
+var
+   n : Integer;
+begin
+   FItems[idx]:=Default(TSymbol);
+   n:=FCount-idx-1;
+   if n>0 then begin
+      Move(FItems[idx+1], FItems[idx], n*SizeOf(TSymbol));
+      FillChar(FItems[FCount-1], SizeOf(TSymbol), 0);
+   end;
+   Dec(FCount);
+end;
+
+// Clear
+//
+procedure TSimpleSymbolList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCapacity:=0;
+   FCount:=0;
+end;
+
+// Enumerate
+//
+procedure TSimpleSymbolList.Enumerate(const callback : TSimpleCallbackSymbol);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callBack(FItems[i])=csAbort then
+         Break;
+end;
+
+// Grow
+//
+procedure TSimpleSymbolList.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// GetItems
+//
+function TSimpleSymbolList.GetItems(const idx : Integer) : TSymbol;
+begin
+   Result:=FItems[idx];
+end;
+
+// SetItems
+//
+procedure TSimpleSymbolList.SetItems(const idx : Integer; const value : TSymbol);
+begin
+   FItems[idx]:=value;
+end;
 
 // ScopeStruct
 //

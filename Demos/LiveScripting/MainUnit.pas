@@ -31,7 +31,7 @@ uses
   dwsUnitSymbols, {$IFDEF LLVM}dwsLLVMCodeGen, dwsLLVM, {$ENDIF}
   {$IFDEF JS}dwsJSCodeGen, {$ENDIF} SynEdit, SynEditHighlighter,
   SynHighlighterDWS, SynCompletionProposal, SynEditMiscClasses, SynEditSearch,
-  SynEditOptionsDialog, SynEditPlugins, SynMacroRecorder;
+  SynEditOptionsDialog, SynEditPlugins, SynMacroRecorder, System.Actions;
 
 type
   TRescanThread = class(TThread)
@@ -494,7 +494,7 @@ var
 begin
   SynEditorOptionsContainer := TSynEditorOptionsContainer.Create(nil);
   SynEditorOptionsContainer.Assign(SynEdit);
-  SynEditOptionsDialog.Execute(SynEditorOptionsContainer, nil);
+  SynEditOptionsDialog.Execute(SynEditorOptionsContainer);
   SynEdit.Assign(SynEditorOptionsContainer);
 end;
 
