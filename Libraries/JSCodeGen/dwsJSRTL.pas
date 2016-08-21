@@ -108,13 +108,28 @@ type
          Str : String;
    end;
 
-   TFormatSplitInfos = class (TObjectList<TFormatSplitInfo>)
+   TFormatSplitInfos = class
+      type
+         TArrayOfFormatSplitInfo = array of TFormatSplitInfo;
       private
+         FItems : TArrayOfFormatSplitInfo;
+         FCount : Integer;
          FIsValid : Boolean;
+
+      protected
+         function GetItem(index : Integer) : TFormatSplitInfo; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItem(index : Integer; const item : TFormatSplitInfo);
 
       public
          constructor Create(const fmtString : String);
-
+         destructor Destroy; override;
+         function Add(const anItem : TFormatSplitInfo) : Integer;
+         function IndexOf(const anItem : TFormatSplitInfo) : Integer;
+         function Extract(idx : Integer) : TFormatSplitInfo;
+         procedure ExtractAll;
+         procedure Clear;
+         property Items[index : Integer] : TFormatSplitInfo read GetItem write SetItem; default;
+         property Count : Integer read FCount;
          property IsValid : Boolean read FIsValid;
    end;
 
@@ -1998,6 +2013,84 @@ begin
       info.Str:=Copy(fmtString, p, n-p+1);
       Add(info);
    end else info.Free;
+end;
+
+// Destroy
+//
+destructor TFormatSplitInfos.Destroy;
+begin
+   Clear;
+   inherited;
+end;
+
+// GetItem
+//
+function TFormatSplitInfos.GetItem(index : Integer) : TFormatSplitInfo;
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   Result:=FItems[index];
+end;
+
+// SetItem
+//
+procedure TFormatSplitInfos.SetItem(index : Integer; const item : TFormatSplitInfo);
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   FItems[index]:=item;
+end;
+
+// Add
+//
+function TFormatSplitInfos.Add(const anItem : TFormatSplitInfo) : Integer;
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   FItems[FCount]:=anItem;
+   Result:=FCount;
+   Inc(FCount);
+end;
+
+// IndexOf
+//
+function TFormatSplitInfos.IndexOf(const anItem : TFormatSplitInfo) : Integer;
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if FItems[i]=anItem then Exit(i);
+   Result:=-1;
+end;
+
+// Extract
+//
+function TFormatSplitInfos.Extract(idx : Integer) : TFormatSplitInfo;
+var
+   n : Integer;
+begin
+   Assert(Cardinal(idx)<Cardinal(FCount), 'Index out of range');
+   n:=Count-1-idx;
+   Dec(FCount);
+   if n>0 then
+      System.Move(FItems[idx+1], FItems[idx], SizeOf(TFormatSplitInfo)*n);
+   Result:=FItems[idx];
+end;
+
+// ExtractAll
+//
+procedure TFormatSplitInfos.ExtractAll;
+begin
+   FCount:=0;
+end;
+
+// Clear
+//
+procedure TFormatSplitInfos.Clear;
+var
+   i : Integer;
+begin
+   for i:=FCount-1 downto 0 do
+      FItems[i].Free;
+   FCount:=0;
 end;
 
 // ------------------------------------------------------------------

@@ -1520,7 +1520,6 @@ end;
 procedure TSimpleObjectObjectHash_TDataSymbol_TVarExpr.Grow;
 var
    i, j, n : Integer;
-   hashCode : Integer;
    oldBuckets : TObjectObjectHashBuckets;
 begin
    if FCapacity=0 then
@@ -1609,6 +1608,7 @@ var
    i : Integer;
    hashCode : Integer;
 begin
+   Result := False;
    if FCount>=FGrowth then Grow;
 
    hashCode:=GetItemHashCode(anItem);

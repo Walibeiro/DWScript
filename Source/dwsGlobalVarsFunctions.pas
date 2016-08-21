@@ -194,11 +194,76 @@ implementation
 // ------------------------------------------------------------------
 
 type
+   TGlobalQueue = class
+      type
+         PItemT = ^ItemT;
+         ItemT = record
+            Prev, Next : PItemT;
+            Value : Variant;
+         end;
+      private
+         FFirst, FLast : PItemT;
+         FCount : Integer;
+         FPool : PItemT;
+         FPoolLeft : Integer;
 
-   TGlobalQueue = TSimpleQueue<Variant>;
+      protected
+         function Alloc : PItemT;
+         procedure Release(i : PItemT);
 
-   TNameGlobalQueueHash = class(TSimpleNameObjectHash<TGlobalQueue>)
-      function GetOrCreate(const aName : String) : TGlobalQueue;
+      public
+         constructor Create(poolSize : Integer = 8);
+         destructor Destroy; override;
+
+         // Adds to the end of the queue
+         procedure Push(const v : Variant);
+         // Removes from the end of the queue
+         function  Pop(var v : Variant) : Boolean; overload;
+         function  Pop : Variant; overload;
+         // Adds to the beginning of the queue
+         procedure Insert(const v : Variant);
+         // Removes from the beginning of the queue
+         function  Pull(var v : Variant) : Boolean; overload;
+         function  Pull : Variant; overload;
+
+         procedure Clear;
+
+         property Count : Integer read FCount;
+   end;
+
+   TNameObjectHash = class(dwsUtils.TNameObjectHash);
+
+   TNameGlobalQueueHash = class
+      private
+         FHash : TNameObjectHash;
+
+      protected
+         function GetIndex(const aName : UnicodeString) : Integer; inline;
+         function GetObjects(const aName : UnicodeString) : TGlobalQueue; inline;
+         procedure SetObjects(const aName : UnicodeString; obj : TGlobalQueue); inline;
+         function GetBucketObject(index : Integer) : TGlobalQueue; inline;
+         procedure SetBucketObject(index : Integer; obj : TGlobalQueue); inline;
+         function GetBucketName(index : Integer) : String; inline;
+
+      public
+         constructor Create(initialCapacity : Integer = 0);
+         destructor Destroy; override;
+
+         function AddObject(const aName : UnicodeString; aObj : TGlobalQueue; replace : Boolean = False) : Boolean; inline;
+
+         procedure Clean; inline;
+         procedure Clear; inline;
+         procedure Pack; inline;
+
+         function Count : Integer; inline;
+         function HighIndex : Integer; inline;
+         function GetOrCreate(const aName : String) : TGlobalQueue;
+
+         property Objects[const aName : UnicodeString] : TGlobalQueue read GetObjects write SetObjects; default;
+
+         property BucketObject[index : Integer] : TGlobalQueue read GetBucketObject write SetBucketObject;
+         property BucketName[index : Integer] : String read GetBucketName;
+         property BucketIndex[const aName : UnicodeString] : Integer read GetIndex;
    end;
 
 var
@@ -225,6 +290,160 @@ end;
 function PrivateVarName(const args : TExprBaseListExec) : String;
 begin
    Result := PrivateVarPrefix(args) + args.AsString[0];
+end;
+
+
+// ------------------
+// ------------------ TGlobalQueue ------------------
+// ------------------
+
+// Create
+//
+constructor TGlobalQueue.Create(poolSize: Integer);
+begin
+   FPoolLeft:=poolSize;
+end;
+
+// Destroy
+//
+destructor TGlobalQueue.Destroy;
+var
+   next : PItemT;
+begin
+   Clear;
+   while FPool<>nil do begin
+      next:=FPool.Next;
+      FreeMem(FPool);
+      FPool:=next;
+   end;
+   inherited;
+end;
+
+// Alloc
+//
+function TGlobalQueue.Alloc: PItemT;
+begin
+   if FPool=nil then
+      Result:=AllocMem(SizeOf(ItemT))
+   else begin
+      Result:=FPool;
+      FPool:=Result.Next;
+      Result.Next:=nil;
+      Inc(FPoolLeft);
+   end;
+   Inc(FCount);
+end;
+
+// Release
+//
+procedure TGlobalQueue.Release(i: PItemT);
+begin
+   i.Value:=Default(Variant);
+   if FPoolLeft>0 then begin
+      Dec(FPoolLeft);
+      i.Prev:=nil;
+      i.Next:=FPool;
+      FPool:=i;
+   end else FreeMem(i);
+   Dec(FCount);
+end;
+
+// Push
+//
+procedure TGlobalQueue.Push(const v: Variant);
+var
+   p : PItemT;
+begin
+   p:=Alloc;
+   p.Value:=v;
+   if FLast<>nil then begin
+      p.Prev:=FLast;
+      FLast.Next:=p;
+   end else FFirst:=p;
+   FLast:=p;
+end;
+
+// Pop
+//
+function TGlobalQueue.Pop(var v: Variant) : Boolean;
+var
+   p : PItemT;
+begin
+   if FCount=0 then Exit(False);
+
+   p:=FLast;
+   FLast:=p.Prev;
+   v:=p.Value;
+   Release(p);
+   if FLast<>nil then
+      FLast.Next:=nil
+   else FFirst:=FLast;
+   Result:=True;
+end;
+
+// Pop
+//
+function TGlobalQueue.Pop : Variant;
+begin
+   Assert(Count>0);
+   Pop(Result);
+end;
+
+// Insert
+//
+procedure TGlobalQueue.Insert(const v: Variant);
+var
+   p : PItemT;
+begin
+   p:=Alloc;
+   p.Value:=v;
+   if FFirst<>nil then begin
+      p.Next:=FFirst;
+      FFirst.Prev:=p;
+   end else FLast:=p;
+   FFirst:=p;
+end;
+
+// Pull
+//
+function TGlobalQueue.Pull(var v: Variant) : Boolean;
+var
+   p : PItemT;
+begin
+   if FCount=0 then Exit(False);
+
+   p:=FFirst;
+   FFirst:=p.Next;
+   v:=p.Value;
+   Release(p);
+   if FFirst<>nil then
+      FFirst.Prev:=nil
+   else FLast:=FFirst;
+   Result:=True;
+end;
+
+// Pull
+//
+function TGlobalQueue.Pull : Variant;
+begin
+   Assert(Count>0);
+   Pull(Result);
+end;
+
+// Clear
+//
+procedure TGlobalQueue.Clear;
+var
+   p, pNext : PItemT;
+begin
+   p:=FFirst;
+   while p<>nil do begin
+      pNext:=p.Next;
+      Release(p);
+      p:=pNext;
+   end;
+   FFirst:=nil;
+   FLast:=nil;
 end;
 
 // ------------------
@@ -384,6 +603,110 @@ begin
    finally
       reader.Free;
    end;
+end;
+
+
+// ------------------
+// ------------------ TNameGlobalQueueHash ------------------
+// ------------------
+
+// Create
+//
+constructor TNameGlobalQueueHash.Create(initialCapacity : Integer = 0);
+begin
+   FHash:=TNameObjectHash.Create(initialCapacity);
+end;
+
+// Destroy
+//
+destructor TNameGlobalQueueHash.Destroy;
+begin
+   FHash.Free;
+end;
+
+// Pack
+//
+procedure TNameGlobalQueueHash.Pack;
+begin
+   FHash.Pack;
+end;
+
+// GetIndex
+//
+function TNameGlobalQueueHash.GetIndex(const aName : UnicodeString) : Integer;
+begin
+   Result:=FHash.GetIndex(aName);
+end;
+
+// GetObjects
+//
+function TNameGlobalQueueHash.GetObjects(const aName : UnicodeString) : TGlobalQueue;
+begin
+   Result:=TGlobalQueue(FHash.GetObjects(aName));
+end;
+
+// SetObjects
+//
+procedure TNameGlobalQueueHash.SetObjects(const aName : UnicodeString; obj : TGlobalQueue);
+begin
+   FHash.SetObjects(aName, obj);
+end;
+
+// AddObject
+//
+function TNameGlobalQueueHash.AddObject(const aName : UnicodeString; aObj : TGlobalQueue;
+  replace : Boolean = False) : Boolean;
+begin
+   Result:=FHash.AddObject(aName, aObj, replace);
+end;
+
+// Clean
+//
+procedure TNameGlobalQueueHash.Clean;
+begin
+   FHash.Clean;
+end;
+
+// Clear
+//
+procedure TNameGlobalQueueHash.Clear;
+begin
+   FHash.Clear;
+end;
+
+// GetBucketName
+//
+function TNameGlobalQueueHash.GetBucketName(index : Integer) : String;
+begin
+   Result:=FHash.GetBucketName(index);
+end;
+
+// GetBucketObject
+//
+function TNameGlobalQueueHash.GetBucketObject(index : Integer) : TGlobalQueue;
+begin
+   Result:=TGlobalQueue(FHash.GetBucketObject(index));
+end;
+
+// SetBucketObject
+//
+procedure TNameGlobalQueueHash.SetBucketObject(index : Integer; obj : TGlobalQueue);
+begin
+   FHash.SetBucketObject(index, obj);
+end;
+
+// Count
+//
+function TNameGlobalQueueHash.Count : Integer;
+begin
+   Result:=FHash.Count;
+end;
+
+// HighIndex
+//
+function TNameGlobalQueueHash.HighIndex : Integer;
+begin
+   Result:=FHash.HighIndex;
 end;
 
 // GetOrCreate

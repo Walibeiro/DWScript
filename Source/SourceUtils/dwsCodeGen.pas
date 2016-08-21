@@ -36,15 +36,75 @@ type
       Name : String;
    end;
 
-   TdwsMappedSymbolHash = class(TSimpleHash<TdwsMappedSymbol>)
+   TSimpleHashMappedSymbolBucket = record
+      HashCode : Cardinal;
+      Value : TdwsMappedSymbol;
+   end;
+   TSimpleHashMappedSymbolFunc = function (const item : TdwsMappedSymbol) : TSimpleHashAction of object;
+
+   TdwsMappedSymbolHash = class
+      private
+         FBuckets : array of TSimpleHashMappedSymbolBucket;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
       protected
-         function SameItem(const item1, item2 : TdwsMappedSymbol) : Boolean; override;
-         function GetItemHashCode(const item1 : TdwsMappedSymbol) : Integer; override;
+         procedure Grow;
+         function LinearFind(const item : TdwsMappedSymbol; var index : Integer) : Boolean;
+      protected
+         function SameItem(const item1, item2 : TdwsMappedSymbol) : Boolean;
+         function GetItemHashCode(const item1 : TdwsMappedSymbol) : Integer;
+
+      public
+         function Add(const anItem : TdwsMappedSymbol) : Boolean; // true if added
+         function Replace(const anItem : TdwsMappedSymbol) : Boolean; // true if added
+         function Remove(const anItem : TdwsMappedSymbol) : Boolean; // true if removed
+         function Contains(const anItem : TdwsMappedSymbol) : Boolean;
+         function Match(var anItem : TdwsMappedSymbol) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashMappedSymbolFunc);
+         procedure Clear;
+
+         property Count : Integer read FCount;
    end;
 
    TdwsCodeGenSymbolScope = (cgssGlobal, cgssClass, cgssLocal, cgssNoMap);
 
    TdwsCodeGenSymbolMaps = class;
+
+   TNameObjectHash = class(dwsUtils.TNameObjectHash);
+
+   TNameSymbolHash = class
+      private
+         FHash : TNameObjectHash;
+
+      protected
+         function GetIndex(const aName : UnicodeString) : Integer; inline;
+         function GetObjects(const aName : UnicodeString) : TSymbol; inline;
+         procedure SetObjects(const aName : UnicodeString; obj : TSymbol); inline;
+         function GetBucketObject(index : Integer) : TSymbol; inline;
+         procedure SetBucketObject(index : Integer; obj : TSymbol); inline;
+         function GetBucketName(index : Integer) : String; inline;
+
+      public
+         constructor Create(initialCapacity : Integer = 0);
+         destructor Destroy; override;
+
+         function AddObject(const aName : UnicodeString; aObj : TSymbol; replace : Boolean = False) : Boolean; inline;
+
+         procedure Clean; inline;
+         procedure Clear; inline;
+         procedure Pack; inline;
+
+         property Objects[const aName : UnicodeString] : TSymbol read GetObjects write SetObjects; default;
+
+         property BucketObject[index : Integer] : TSymbol read GetBucketObject write SetBucketObject;
+         property BucketName[index : Integer] : String read GetBucketName;
+         property BucketIndex[const aName : UnicodeString] : Integer read GetIndex;
+
+         function Count : Integer; inline;
+         function HighIndex : Integer; inline;
+   end;
 
    TdwsCodeGenSymbolMap = class (TRefCountedObject)
       private
@@ -52,7 +112,7 @@ type
          FSymbol : TSymbol;
          FHash : TdwsMappedSymbolHash;
          FMaps : TdwsCodeGenSymbolMaps;
-         FNames : TSimpleNameObjectHash<TSymbol>;
+         FNames : TNameSymbolHash;
          FLookup : TdwsMappedSymbol;
          FReservedSymbol : TSymbol;
          FPrefix : String;
@@ -85,13 +145,27 @@ type
          property Symbol : TSymbol read FSymbol;
    end;
 
-   TdwsCodeGenSymbolMaps = class(TObjectList<TdwsCodeGenSymbolMap>)
+   TdwsCodeGenSymbolMaps = class
+      type
+        TArrayOfCodeGenSymbolMap = array of TdwsCodeGenSymbolMap;
       private
+         FItems : TArrayOfCodeGenSymbolMap;
+         FCount : Integer;
 
       protected
+         function GetItem(index : Integer) : TdwsCodeGenSymbolMap; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItem(index : Integer; const item : TdwsCodeGenSymbolMap);
 
       public
+         destructor Destroy; override;
+         function Add(const anItem : TdwsCodeGenSymbolMap) : Integer;
+         function IndexOf(const anItem : TdwsCodeGenSymbolMap) : Integer;
+         function Extract(idx : Integer) : TdwsCodeGenSymbolMap;
+         procedure ExtractAll;
+         procedure Clear;
          function MapOf(symbol : TSymbol) : TdwsCodeGenSymbolMap;
+         property Items[index : Integer] : TdwsCodeGenSymbolMap read GetItem write SetItem; default;
+         property Count : Integer read FCount;
    end;
 
    TdwsRegisteredCodeGen = class (TRefCountedObject)
@@ -102,9 +176,54 @@ type
          destructor Destroy; override;
    end;
 
-   TdwsRegisteredCodeGenList = class(TSortedList<TdwsRegisteredCodeGen>)
+   TSimpleCallbackRegisteredCodeGen = function (var item : TdwsRegisteredCodeGen) : TSimpleCallbackStatus;
+
+   TdwsRegisteredCodeGenList = class
+      type
+         TArrayOfRegisteredCodeGen = array of TdwsRegisteredCodeGen;
+      private
+         FItems : TArrayOfRegisteredCodeGen;
+         FCount : Integer;
+
       protected
-         function Compare(const item1, item2 : TdwsRegisteredCodeGen) : Integer; override;
+         function GetItem(index : Integer) : TdwsRegisteredCodeGen;
+         function Find(const item : TdwsRegisteredCodeGen; var index : Integer) : Boolean;
+         function Compare(const item1, item2 : TdwsRegisteredCodeGen) : Integer;
+         procedure InsertItem(index : Integer; const anItem : TdwsRegisteredCodeGen);
+
+      public
+         function Add(const anItem : TdwsRegisteredCodeGen) : Integer;
+         function AddOrFind(const anItem : TdwsRegisteredCodeGen; var added : Boolean) : Integer;
+         function Extract(const anItem : TdwsRegisteredCodeGen) : Integer;
+         function ExtractAt(index : Integer) : TdwsRegisteredCodeGen;
+         function IndexOf(const anItem : TdwsRegisteredCodeGen) : Integer;
+         procedure Clear;
+         procedure Clean;
+         procedure Enumerate(const callback : TSimpleCallbackRegisteredCodeGen);
+         property Items[index : Integer] : TdwsRegisteredCodeGen read GetItem; default;
+         property Count : Integer read FCount;
+   end;
+
+   TdwsMethodSymbolList = class
+      type
+         TArrayOfMethodSymbol = array of TMethodSymbol;
+      private
+         FItems : TArrayOfMethodSymbol;
+         FCount : Integer;
+
+      protected
+         function GetItem(index : Integer) : TMethodSymbol; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItem(index : Integer; const item : TMethodSymbol);
+
+      public
+         destructor Destroy; override;
+         function Add(const anItem : TMethodSymbol) : Integer;
+         function IndexOf(const anItem : TMethodSymbol) : Integer;
+         function Extract(idx : Integer) : TMethodSymbol;
+         procedure ExtractAll;
+         procedure Clear;
+         property Items[index : Integer] : TMethodSymbol read GetItem write SetItem; default;
+         property Count : Integer read FCount;
    end;
 
    TdwsCodeGenOption = (cgoNoRangeChecks, cgoNoCheckInstantiated, cgoNoCheckLoopStep,
@@ -370,6 +489,126 @@ end;
 // ------------------ TdwsRegisteredCodeGenList ------------------
 // ------------------
 
+// GetItem
+//
+function TdwsRegisteredCodeGenList.GetItem(index : Integer) : TdwsRegisteredCodeGen;
+begin
+   Result:=FItems[index];
+end;
+
+// Find
+//
+function TdwsRegisteredCodeGenList.Find(const item : TdwsRegisteredCodeGen; var index : Integer) : Boolean;
+var
+   lo, hi, mid, compResult : Integer;
+begin
+   Result:=False;
+   lo:=0;
+   hi:=FCount-1;
+   while lo<=hi do begin
+      mid:=(lo+hi) shr 1;
+      compResult:=Compare(FItems[mid], item);
+      if compResult<0 then
+         lo:=mid+1
+      else begin
+         hi:=mid- 1;
+         if compResult=0 then
+            Result:=True;
+      end;
+   end;
+   index:=lo;
+end;
+
+// InsertItem
+//
+procedure TdwsRegisteredCodeGenList.InsertItem(index : Integer; const anItem : TdwsRegisteredCodeGen);
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   if index<Count then
+      System.Move(FItems[index], FItems[index+1], (Count-index)*SizeOf(Pointer));
+   Inc(FCount);
+   FItems[index]:=anItem;
+end;
+
+// Add
+//
+function TdwsRegisteredCodeGenList.Add(const anItem : TdwsRegisteredCodeGen) : Integer;
+begin
+   Find(anItem, Result);
+   InsertItem(Result, anItem);
+end;
+
+// AddOrFind
+//
+function TdwsRegisteredCodeGenList.AddOrFind(const anItem : TdwsRegisteredCodeGen; var added : Boolean) : Integer;
+begin
+   added:=not Find(anItem, Result);
+   if added then
+      InsertItem(Result, anItem);
+end;
+
+// Extract
+//
+function TdwsRegisteredCodeGenList.Extract(const anItem : TdwsRegisteredCodeGen) : Integer;
+begin
+   if Find(anItem, Result) then
+      ExtractAt(Result)
+   else Result:=-1;
+end;
+
+// ExtractAt
+//
+function TdwsRegisteredCodeGenList.ExtractAt(index : Integer) : TdwsRegisteredCodeGen;
+var
+   n : Integer;
+begin
+   Dec(FCount);
+   Result:=FItems[index];
+   n:=FCount-index;
+   if n>0 then
+      System.Move(FItems[index+1], FItems[index], n*SizeOf(TdwsRegisteredCodeGen));
+   SetLength(FItems, FCount);
+end;
+
+// IndexOf
+//
+function TdwsRegisteredCodeGenList.IndexOf(const anItem : TdwsRegisteredCodeGen) : Integer;
+begin
+   if not Find(anItem, Result) then
+      Result:=-1;
+end;
+
+// Clear
+//
+procedure TdwsRegisteredCodeGenList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+end;
+
+// Clean
+//
+procedure TdwsRegisteredCodeGenList.Clean;
+var
+   i : Integer;
+begin
+   for i:=0 to FCount-1 do
+      FItems[i].Free;
+   Clear;
+end;
+
+// Enumerate
+//
+procedure TdwsRegisteredCodeGenList.Enumerate(const callback : TSimpleCallbackRegisteredCodeGen);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callback(FItems[i])=csAbort then
+         Break;
+end;
+
 // Compare
 //
 function TdwsRegisteredCodeGenList.Compare(const item1, item2 : TdwsRegisteredCodeGen) : Integer;
@@ -383,6 +622,89 @@ begin
    else if i1=i2 then
       Result:=0
    else Result:=1;
+end;
+
+// ------------------
+// ------------------ TdwsMethodSymbolList ------------------
+// ------------------
+
+
+// Destroy
+//
+destructor TdwsMethodSymbolList.Destroy;
+begin
+   Clear;
+   inherited;
+end;
+
+// GetItem
+//
+function TdwsMethodSymbolList.GetItem(index : Integer) : TMethodSymbol;
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   Result:=FItems[index];
+end;
+
+// SetItem
+//
+procedure TdwsMethodSymbolList.SetItem(index : Integer; const item : TMethodSymbol);
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   FItems[index]:=item;
+end;
+
+// Add
+//
+function TdwsMethodSymbolList.Add(const anItem : TMethodSymbol) : Integer;
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   FItems[FCount]:=anItem;
+   Result:=FCount;
+   Inc(FCount);
+end;
+
+// IndexOf
+//
+function TdwsMethodSymbolList.IndexOf(const anItem : TMethodSymbol) : Integer;
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if FItems[i]=anItem then Exit(i);
+   Result:=-1;
+end;
+
+// Extract
+//
+function TdwsMethodSymbolList.Extract(idx : Integer) : TMethodSymbol;
+var
+   n : Integer;
+begin
+   Assert(Cardinal(idx)<Cardinal(FCount), 'Index out of range');
+   n:=Count-1-idx;
+   Dec(FCount);
+   if n>0 then
+      System.Move(FItems[idx+1], FItems[idx], SizeOf(TMethodSymbol)*n);
+   Result:=FItems[idx];
+end;
+
+// ExtractAll
+//
+procedure TdwsMethodSymbolList.ExtractAll;
+begin
+   FCount:=0;
+end;
+
+// Clear
+//
+procedure TdwsMethodSymbolList.Clear;
+var
+   i : Integer;
+begin
+   for i:=FCount-1 downto 0 do
+      FItems[i].Free;
+   FCount:=0;
 end;
 
 // ------------------
@@ -1897,14 +2219,14 @@ procedure TdwsCodeGen.DeVirtualize;
 var
    sym : TSymbol;
    methSym : TMethodSymbol;
-   methods : TObjectList<TMethodSymbol>;
+   methods : TdwsMethodSymbolList;
    marks : array of Boolean;
    i, k : Integer;
 begin
    if FSymbolDictionary=nil then Exit;
    if not (cgoDeVirtualize in Options) then Exit;
 
-   methods:=TObjectList<TMethodSymbol>.Create;
+   methods:=TdwsMethodSymbolList.Create;
    try
       // collect all method symbols that are virtual
       for i:=0 to FSymbolDictionary.Count-1 do begin
@@ -1984,6 +2306,161 @@ end;
 // ------------------ TdwsMappedSymbolHash ------------------
 // ------------------
 
+// Grow
+//
+procedure TdwsMappedSymbolHash.Grow;
+var
+   i, j, n : Integer;
+   oldBuckets : array of TSimpleHashMappedSymbolBucket;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TdwsMappedSymbolHash.LinearFind(const item : TdwsMappedSymbol; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TdwsMappedSymbolHash.Add(const anItem : TdwsMappedSymbol) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TdwsMappedSymbolHash.Replace(const anItem : TdwsMappedSymbol) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   Result := False;
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TdwsMappedSymbolHash.Remove(const anItem : TdwsMappedSymbol) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TdwsMappedSymbol);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TdwsMappedSymbolHash.Contains(const anItem : TdwsMappedSymbol) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TdwsMappedSymbolHash.Match(var anItem : TdwsMappedSymbol) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TdwsMappedSymbolHash.Enumerate(callBack : TSimpleHashMappedSymbolFunc);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TdwsMappedSymbol);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TdwsMappedSymbolHash.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
+
 // SameItem
 //
 function TdwsMappedSymbolHash.SameItem(const item1, item2 : TdwsMappedSymbol) : Boolean;
@@ -1997,6 +2474,109 @@ function TdwsMappedSymbolHash.GetItemHashCode(const item1 : TdwsMappedSymbol) : 
 begin
    Result:=NativeInt(item1.Symbol) shr 3;
    Result:=Result xor (Result shr 15);
+end;
+
+// ------------------
+// ------------------ TNameSymbolHash ------------------
+// ------------------
+
+// Create
+//
+constructor TNameSymbolHash.Create(initialCapacity : Integer = 0);
+begin
+   FHash:=TNameObjectHash.Create(initialCapacity);
+end;
+
+// Destroy
+//
+destructor TNameSymbolHash.Destroy;
+begin
+   FHash.Free;
+end;
+
+// Pack
+//
+procedure TNameSymbolHash.Pack;
+begin
+   FHash.Pack;
+end;
+
+// GetIndex
+//
+function TNameSymbolHash.GetIndex(const aName : UnicodeString) : Integer;
+begin
+   Result:=FHash.GetIndex(aName);
+end;
+
+// GetObjects
+//
+function TNameSymbolHash.GetObjects(const aName : UnicodeString) : TSymbol;
+begin
+   Result:=TSymbol(FHash.GetObjects(aName));
+end;
+
+// SetObjects
+//
+procedure TNameSymbolHash.SetObjects(const aName : UnicodeString; obj : TSymbol);
+begin
+   FHash.SetObjects(aName, obj);
+end;
+
+// AddObject
+//
+function TNameSymbolHash.AddObject(const aName : UnicodeString; aObj : TSymbol;
+   replace : Boolean = False) : Boolean;
+begin
+   Result:=FHash.AddObject(aName, aObj, replace);
+end;
+
+// Clean
+//
+procedure TNameSymbolHash.Clean;
+begin
+   FHash.Clean;
+end;
+
+// Clear
+//
+procedure TNameSymbolHash.Clear;
+begin
+   FHash.Clear;
+end;
+
+// GetBucketName
+//
+function TNameSymbolHash.GetBucketName(index : Integer) : String;
+begin
+   Result:=FHash.GetBucketName(index);
+end;
+
+// GetBucketObject
+//
+function TNameSymbolHash.GetBucketObject(index : Integer) : TSymbol;
+begin
+   Result:=TSymbol(FHash.GetBucketObject(index));
+end;
+
+// SetBucketObject
+//
+procedure TNameSymbolHash.SetBucketObject(index : Integer; obj : TSymbol);
+begin
+   FHash.SetBucketObject(index, obj);
+end;
+
+// Count
+//
+function TNameSymbolHash.Count : Integer;
+begin
+   Result:=FHash.Count;
+end;
+
+// HighIndex
+//
+function TNameSymbolHash.HighIndex : Integer;
+begin
+   Result:=FHash.HighIndex;
 end;
 
 // ------------------
@@ -2016,7 +2596,7 @@ begin
    FSymbol:=aSymbol;
    if aParent=nil then begin
       FHash:=TdwsMappedSymbolHash.Create;
-      FNames:=TSimpleNameObjectHash<TSymbol>.Create;
+      FNames:=TNameSymbolHash.Create;
       FReservedSymbol:=TSymbol.Create('', nil);
    end;
    if aSymbol is TUnitSymbol then
@@ -2235,6 +2815,85 @@ end;
 // ------------------
 // ------------------ TdwsCodeGenSymbolMaps ------------------
 // ------------------
+
+
+// Destroy
+//
+destructor TdwsCodeGenSymbolMaps.Destroy;
+begin
+   Clear;
+   inherited;
+end;
+
+// GetItem
+//
+function TdwsCodeGenSymbolMaps.GetItem(index : Integer) : TdwsCodeGenSymbolMap;
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   Result:=FItems[index];
+end;
+
+// SetItem
+//
+procedure TdwsCodeGenSymbolMaps.SetItem(index : Integer; const item : TdwsCodeGenSymbolMap);
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   FItems[index]:=item;
+end;
+
+// Add
+//
+function TdwsCodeGenSymbolMaps.Add(const anItem : TdwsCodeGenSymbolMap) : Integer;
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   FItems[FCount]:=anItem;
+   Result:=FCount;
+   Inc(FCount);
+end;
+
+// IndexOf
+//
+function TdwsCodeGenSymbolMaps.IndexOf(const anItem : TdwsCodeGenSymbolMap) : Integer;
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if FItems[i]=anItem then Exit(i);
+   Result:=-1;
+end;
+
+// Extract
+//
+function TdwsCodeGenSymbolMaps.Extract(idx : Integer) : TdwsCodeGenSymbolMap;
+var
+   n : Integer;
+begin
+   Assert(Cardinal(idx)<Cardinal(FCount), 'Index out of range');
+   n:=Count-1-idx;
+   Dec(FCount);
+   if n>0 then
+      System.Move(FItems[idx+1], FItems[idx], SizeOf(TdwsCodeGenSymbolMap)*n);
+   Result:=FItems[idx];
+end;
+
+// ExtractAll
+//
+procedure TdwsCodeGenSymbolMaps.ExtractAll;
+begin
+   FCount:=0;
+end;
+
+// Clear
+//
+procedure TdwsCodeGenSymbolMaps.Clear;
+var
+   i : Integer;
+begin
+   for i:=FCount-1 downto 0 do
+      FItems[i].Free;
+   FCount:=0;
+end;
 
 // MapOf
 //

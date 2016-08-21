@@ -28,9 +28,26 @@ uses
 
 type
 
-   TDataSymbolList = class(TObjectList<TDataSymbol>)
+   TDataSymbolList = class
+      type
+         TArrayOfDataSymbol = array of TDataSymbol;
+      private
+        FItems : TArrayOfDataSymbol;
+        FCount : Integer;
+
+      protected
+         function GetItem(index : Integer) : TDataSymbol; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
+         procedure SetItem(index : Integer; const item : TDataSymbol);
+
       public
          destructor Destroy; override;
+         function Add(const anItem : TDataSymbol) : Integer;
+         function IndexOf(const anItem : TDataSymbol) : Integer;
+         function Extract(idx : Integer) : TDataSymbol;
+         procedure ExtractAll;
+         procedure Clear;
+         property Items[index : Integer] : TDataSymbol read GetItem write SetItem; default;
+         property Count : Integer read FCount;
    end;
 
    TdwsCodeGenSymbolMapJSObfuscating = class (TdwsCodeGenSymbolMap)
@@ -38,10 +55,92 @@ type
          function DoNeedUniqueName(symbol : TSymbol; tryCount : Integer; canObfuscate : Boolean) : String; override;
    end;
 
-   TSimpleSymbolHash = class (TSimpleObjectHash<TSymbol>)
+   TSimpleHashSymbolBucket = record
+      HashCode : Cardinal;
+      Value : TSymbol;
    end;
 
-   TSimpleProgramHash = class (TSimpleObjectHash<TdwsProgram>)
+   TSimpleHashSymbolFunc = function (const item : TSymbol) : TSimpleHashAction of object;
+
+   TSimpleSymbolHash = class
+      private
+         FBuckets : array of TSimpleHashSymbolBucket;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function LinearFind(const item : TSymbol; var index : Integer) : Boolean;
+         function SameItem(const item1, item2 : TSymbol) : Boolean;
+         function GetItemHashCode(const item1 : TSymbol) : Integer;
+
+      public
+         function Add(const anItem : TSymbol) : Boolean; // true if added
+         function Replace(const anItem : TSymbol) : Boolean; // true if added
+         function Remove(const anItem : TSymbol) : Boolean; // true if removed
+         function Contains(const anItem : TSymbol) : Boolean;
+         function Match(var anItem : TSymbol) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashSymbolFunc);
+         procedure Clear;
+         procedure Clean;
+
+         property Count : Integer read FCount;
+   end;
+
+   TSimpleHashProgramBucket = record
+      HashCode : Cardinal;
+      Value : TdwsProgram;
+   end;
+
+   TSimpleHashProgramFunc = function (const item : TdwsProgram) : TSimpleHashAction of object;
+
+   TSimpleProgramHash = class
+      private
+         FBuckets : array of TSimpleHashProgramBucket;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function LinearFind(const item : TdwsProgram; var index : Integer) : Boolean;
+         function SameItem(const item1, item2 : TdwsProgram) : Boolean;
+         function GetItemHashCode(const item1 : TdwsProgram) : Integer;
+
+      public
+         function Add(const anItem : TdwsProgram) : Boolean; // true if added
+         function Replace(const anItem : TdwsProgram) : Boolean; // true if added
+         function Remove(const anItem : TdwsProgram) : Boolean; // true if removed
+         function Contains(const anItem : TdwsProgram) : Boolean;
+         function Match(var anItem : TdwsProgram) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashProgramFunc);
+         procedure Clear;
+         procedure Clean;
+
+         property Count : Integer read FCount;
+   end;
+
+   TSimpleStackDataSymbolList = class
+      type
+        TArrayOfDataSymbolList = array of TDataSymbolList;
+      private
+         FItems : TArrayOfDataSymbolList;
+         FCount : Integer;
+         FCapacity : Integer;
+      protected
+         procedure Grow;
+         function GetPeek : TDataSymbolList; inline;
+         procedure SetPeek(const item : TDataSymbolList);
+         function GetItems(const position : Integer) : TDataSymbolList;
+         procedure SetItems(const position : Integer; const value : TDataSymbolList);
+      public
+         procedure Push(const item : TDataSymbolList);
+         procedure Pop; inline;
+         procedure Clear;
+         property Peek : TDataSymbolList read GetPeek write SetPeek;
+         property Items[const position : Integer] : TDataSymbolList read GetItems write SetItems;
+         property Count : Integer read FCount;
    end;
 
    TdwsJSCodeGen = class (TdwsTextCodeGen)
@@ -50,7 +149,7 @@ type
          FAllLocalVarSymbols : TSimpleSymbolHash;
          FAllLocalVarWithinTryExpr : Integer;
          FDeclaredLocalVars : TDataSymbolList;
-         FDeclaredLocalVarsStack : TSimpleStack<TDataSymbolList>;
+         FDeclaredLocalVarsStack : TSimpleStackDataSymbolList;
          FMainBodyName : String;
          FSelfSymbolName : String;
          FResultSymbolName : String;
@@ -169,23 +268,110 @@ type
          procedure CodeGen(codeGen : TdwsCodeGen; expr : TExprBase); override;
    end;
 
-   TdwsJSCodeGenIntercepts = class(TSimpleNameObjectHash<TdwsJSCodeGenIntercept>)
+   TNameObjectHash = class(dwsUtils.TNameObjectHash);
+
+   TdwsJSCodeGenIntercepts = class
+      private
+         FHash : TNameObjectHash;
+
+      protected
+         function GetIndex(const aName : UnicodeString) : Integer; inline;
+         function GetObjects(const aName : UnicodeString) : TdwsJSCodeGenIntercept; inline;
+         procedure SetObjects(const aName : UnicodeString; obj : TdwsJSCodeGenIntercept); inline;
+         function GetBucketObject(index : Integer) : TdwsJSCodeGenIntercept; inline;
+         procedure SetBucketObject(index : Integer; obj : TdwsJSCodeGenIntercept); inline;
+         function GetBucketName(index : Integer) : String; inline;
+
       public
+         constructor Create(initialCapacity : Integer = 0);
          destructor Destroy; override;
+
+         function AddObject(const aName : UnicodeString; aObj : TdwsJSCodeGenIntercept; replace : Boolean = False) : Boolean; inline;
+
+         procedure Clean; inline;
+         procedure Clear; inline;
+         procedure Pack; inline;
+
+         property Objects[const aName : UnicodeString] : TdwsJSCodeGenIntercept read GetObjects write SetObjects; default;
+
+         property BucketObject[index : Integer] : TdwsJSCodeGenIntercept read GetBucketObject write SetBucketObject;
+         property BucketName[index : Integer] : String read GetBucketName;
+         property BucketIndex[const aName : UnicodeString] : Integer read GetIndex;
+
+         function Count : Integer; inline;
+         function HighIndex : Integer; inline;
 
          function Match(expr : TExprBase) : TdwsJSCodeGenIntercept;
    end;
 
-   TSimpleClassHash = class(TSimpleHash<TClass>)
+   TSimpleNameJSCodeGenInterceptsHash = class
+      private
+         FHash : TNameObjectHash;
+
       protected
-         function SameItem(const item1, item2 : TClass) : Boolean; override;
-         function GetItemHashCode(const item1 : TClass) : Integer; override;
+         function GetIndex(const aName : UnicodeString) : Integer; inline;
+         function GetObjects(const aName : UnicodeString) : TdwsJSCodeGenIntercepts; inline;
+         procedure SetObjects(const aName : UnicodeString; obj : TdwsJSCodeGenIntercepts); inline;
+         function GetBucketObject(index : Integer) : TdwsJSCodeGenIntercepts; inline;
+         procedure SetBucketObject(index : Integer; obj : TdwsJSCodeGenIntercepts); inline;
+         function GetBucketName(index : Integer) : String; inline;
+
+      public
+         constructor Create(initialCapacity : Integer = 0);
+         destructor Destroy; override;
+
+         function AddObject(const aName : UnicodeString; aObj : TdwsJSCodeGenIntercepts; replace : Boolean = False) : Boolean; inline;
+
+         procedure Clean; inline;
+         procedure Clear; inline;
+         procedure Pack; inline;
+
+         property Objects[const aName : UnicodeString] : TdwsJSCodeGenIntercepts read GetObjects write SetObjects; default;
+
+         property BucketObject[index : Integer] : TdwsJSCodeGenIntercepts read GetBucketObject write SetBucketObject;
+         property BucketName[index : Integer] : String read GetBucketName;
+         property BucketIndex[const aName : UnicodeString] : Integer read GetIndex;
+
+         function Count : Integer; inline;
+         function HighIndex : Integer; inline;
+   end;
+
+   TSimpleHashClassBucket = record
+      HashCode : Cardinal;
+      Value : TClass;
+   end;
+
+   TSimpleHashClassFunc = function (const item : TClass) : TSimpleHashAction of object;
+
+   TSimpleClassHash = class
+      private
+         FBuckets : array of TSimpleHashClassBucket;
+         FCount : Integer;
+         FGrowth : Integer;
+         FCapacity : Integer;
+
+      protected
+         procedure Grow;
+         function LinearFind(const item : TClass; var index : Integer) : Boolean;
+         function SameItem(const item1, item2 : TClass) : Boolean;
+         function GetItemHashCode(const item1 : TClass) : Integer;
+
+      public
+         function Add(const anItem : TClass) : Boolean; // true if added
+         function Replace(const anItem : TClass) : Boolean; // true if added
+         function Remove(const anItem : TClass) : Boolean; // true if removed
+         function Contains(const anItem : TClass) : Boolean;
+         function Match(var anItem : TClass) : Boolean;
+         procedure Enumerate(callBack : TSimpleHashClassFunc);
+         procedure Clear;
+
+         property Count : Integer read FCount;
    end;
 
    TdwsJSCodeGenEnvironment = class(TInterfacedSelfObject, IdwsEnvironment)
       private
          FCodeGen : TdwsJSCodeGen;
-         FIntercepts : TSimpleNameObjectHash<TdwsJSCodeGenIntercepts>;
+         FIntercepts : TSimpleNameJSCodeGenInterceptsHash;
          FMissedIntercepts : TSimpleClassHash;
          FExec : IdwsProgramExecution;
 
@@ -788,7 +974,8 @@ implementation
 // ------------------------------------------------------------------
 // ------------------------------------------------------------------
 
-uses dwsJSRTL;
+uses
+  dwsExprList, dwsJSRTL;
 
 const
    cBoolToJSBool : array [False..True] of String = ('false', 'true');
@@ -915,6 +1102,447 @@ begin
 end;
 
 // ------------------
+// ------------------ TSimpleSymbolHash ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleSymbolHash.Grow;
+var
+   i, j, n : Integer;
+   oldBuckets : array of TSimpleHashSymbolBucket;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TSimpleSymbolHash.LinearFind(const item : TSymbol; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TSimpleSymbolHash.Add(const anItem : TSymbol) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TSimpleSymbolHash.Replace(const anItem : TSymbol) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   Result:=False;
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TSimpleSymbolHash.Remove(const anItem : TSymbol) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TSymbol);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TSimpleSymbolHash.Contains(const anItem : TSymbol) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TSimpleSymbolHash.Match(var anItem : TSymbol) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TSimpleSymbolHash.Enumerate(callBack : TSimpleHashSymbolFunc);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TSymbol);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TSimpleSymbolHash.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
+
+// SameItem
+//
+function TSimpleSymbolHash.SameItem(const item1, item2 : TSymbol) : Boolean;
+begin
+   Result:=(item1=item2);
+end;
+
+// GetItemHashCode
+//
+function TSimpleSymbolHash.GetItemHashCode(const item1 : TSymbol) : Integer;
+var
+   p : NativeInt;
+begin
+   p:=PNativeInt(@item1)^; // workaround compiler issue
+   Result:=(p shr 4)+1;
+end;
+
+// Clean
+//
+procedure TSimpleSymbolHash.Clean;
+var
+   i : Integer;
+begin
+   for i:=0 to FCapacity-1 do
+      if FBuckets[i].HashCode<>0 then
+         FBuckets[i].Value.Free;
+   Clear;
+end;
+
+// ------------------
+// ------------------ TSimpleProgramHash ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleProgramHash.Grow;
+var
+   i, j, n : Integer;
+   oldBuckets : array of TSimpleHashProgramBucket;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TSimpleProgramHash.LinearFind(const item : TdwsProgram; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TSimpleProgramHash.Add(const anItem : TdwsProgram) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TSimpleProgramHash.Replace(const anItem : TdwsProgram) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   Result:=False;
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TSimpleProgramHash.Remove(const anItem : TdwsProgram) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TdwsProgram);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TSimpleProgramHash.Contains(const anItem : TdwsProgram) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TSimpleProgramHash.Match(var anItem : TdwsProgram) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TSimpleProgramHash.Enumerate(callBack : TSimpleHashProgramFunc);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TdwsProgram);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TSimpleProgramHash.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
+
+// SameItem
+//
+function TSimpleProgramHash.SameItem(const item1, item2 : TdwsProgram) : Boolean;
+begin
+   Result:=(item1=item2);
+end;
+
+// GetItemHashCode
+//
+function TSimpleProgramHash.GetItemHashCode(const item1 : TdwsProgram) : Integer;
+var
+   p : NativeInt;
+begin
+   p:=PNativeInt(@item1)^; // workaround compiler issue
+   Result:=(p shr 4)+1;
+end;
+
+// Clean
+//
+procedure TSimpleProgramHash.Clean;
+var
+   i : Integer;
+begin
+   for i:=0 to FCapacity-1 do
+      if FBuckets[i].HashCode<>0 then
+         FBuckets[i].Value.Free;
+   Clear;
+end;
+
+// ------------------
+// ------------------ TSimpleStackDataSymbolList ------------------
+// ------------------
+
+// Grow
+//
+procedure TSimpleStackDataSymbolList.Grow;
+begin
+   FCapacity:=FCapacity+8+(FCapacity shr 2);
+   SetLength(FItems, FCapacity);
+end;
+
+// Push
+//
+procedure TSimpleStackDataSymbolList.Push(const item : TDataSymbolList);
+begin
+   if FCount=FCapacity then Grow;
+   FItems[FCount]:=item;
+   Inc(FCount);
+end;
+
+// Pop
+//
+procedure TSimpleStackDataSymbolList.Pop;
+begin
+   Dec(FCount);
+end;
+
+// GetPeek
+//
+function TSimpleStackDataSymbolList.GetPeek : TDataSymbolList;
+begin
+   Result:=FItems[FCount-1];
+end;
+
+// SetPeek
+//
+procedure TSimpleStackDataSymbolList.SetPeek(const item : TDataSymbolList);
+begin
+   FItems[FCount-1]:=item;
+end;
+
+// GetItems
+//
+function TSimpleStackDataSymbolList.GetItems(const position : Integer) : TDataSymbolList;
+begin
+   Result:=FItems[FCount-1-position];
+end;
+
+// SetItems
+//
+procedure TSimpleStackDataSymbolList.SetItems(const position : Integer; const value : TDataSymbolList);
+begin
+   FItems[FCount-1-position]:=value;
+end;
+
+// Clear
+//
+procedure TSimpleStackDataSymbolList.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+   FCapacity:=0;
+end;
+
+// ------------------
 // ------------------ TdwsJSCodeGen ------------------
 // ------------------
 
@@ -927,7 +1555,7 @@ begin
    FAllLocalVarSymbols:=TSimpleSymbolHash.Create;
 
    FDeclaredLocalVars:=TDataSymbolList.Create;
-   FDeclaredLocalVarsStack:=TSimpleStack<TDataSymbolList>.Create;
+   FDeclaredLocalVarsStack:=TSimpleStackDataSymbolList.Create;
 
    FUniqueGlobalVar:=TFastCompareStringList.Create;
    FCustomDependency:=TFastCompareStringList.Create;
@@ -3675,9 +4303,153 @@ type
       Column : Integer;
    end;
 
-   TSortedDebugSymbols = class(TSortedList<TDebugSymbol>)
-      function Compare(const item1, item2 : TDebugSymbol) : Integer; override;
+   TSimpleCallbackDebugSymbol = function (var item : TDebugSymbol) : TSimpleCallbackStatus;
+
+   TSortedDebugSymbols = class
+      type
+         TArrayOfDebugSymbol = array of TDebugSymbol;
+      private
+         FItems : TArrayOfDebugSymbol;
+         FCount : Integer;
+
+      protected
+         function GetItem(index : Integer) : TDebugSymbol;
+         function Find(const item : TDebugSymbol; var index : Integer) : Boolean;
+         function Compare(const item1, item2 : TDebugSymbol) : Integer;
+         procedure InsertItem(index : Integer; const anItem : TDebugSymbol);
+
+      public
+         function Add(const anItem : TDebugSymbol) : Integer;
+         function AddOrFind(const anItem : TDebugSymbol; var added : Boolean) : Integer;
+         function Extract(const anItem : TDebugSymbol) : Integer;
+         function ExtractAt(index : Integer) : TDebugSymbol;
+         function IndexOf(const anItem : TDebugSymbol) : Integer;
+         procedure Clear;
+         procedure Clean;
+         procedure Enumerate(const callback : TSimpleCallbackDebugSymbol);
+         property Items[index : Integer] : TDebugSymbol read GetItem; default;
+         property Count : Integer read FCount;
    end;
+
+// GetItem
+//
+function TSortedDebugSymbols.GetItem(index : Integer) : TDebugSymbol;
+begin
+   Result:=FItems[index];
+end;
+
+// Find
+//
+function TSortedDebugSymbols.Find(const item : TDebugSymbol; var index : Integer) : Boolean;
+var
+   lo, hi, mid, compResult : Integer;
+begin
+   Result:=False;
+   lo:=0;
+   hi:=FCount-1;
+   while lo<=hi do begin
+      mid:=(lo+hi) shr 1;
+      compResult:=Compare(FItems[mid], item);
+      if compResult<0 then
+         lo:=mid+1
+      else begin
+         hi:=mid- 1;
+         if compResult=0 then
+            Result:=True;
+      end;
+   end;
+   index:=lo;
+end;
+
+// InsertItem
+//
+procedure TSortedDebugSymbols.InsertItem(index : Integer; const anItem : TDebugSymbol);
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   if index<Count then
+      System.Move(FItems[index], FItems[index+1], (Count-index)*SizeOf(Pointer));
+   Inc(FCount);
+   FItems[index]:=anItem;
+end;
+
+// Add
+//
+function TSortedDebugSymbols.Add(const anItem : TDebugSymbol) : Integer;
+begin
+   Find(anItem, Result);
+   InsertItem(Result, anItem);
+end;
+
+// AddOrFind
+//
+function TSortedDebugSymbols.AddOrFind(const anItem : TDebugSymbol; var added : Boolean) : Integer;
+begin
+   added:=not Find(anItem, Result);
+   if added then
+      InsertItem(Result, anItem);
+end;
+
+// Extract
+//
+function TSortedDebugSymbols.Extract(const anItem : TDebugSymbol) : Integer;
+begin
+   if Find(anItem, Result) then
+      ExtractAt(Result)
+   else Result:=-1;
+end;
+
+// ExtractAt
+//
+function TSortedDebugSymbols.ExtractAt(index : Integer) : TDebugSymbol;
+var
+   n : Integer;
+begin
+   Dec(FCount);
+   Result:=FItems[index];
+   n:=FCount-index;
+   if n>0 then
+      System.Move(FItems[index+1], FItems[index], n*SizeOf(TDebugSymbol));
+   SetLength(FItems, FCount);
+end;
+
+// IndexOf
+//
+function TSortedDebugSymbols.IndexOf(const anItem : TDebugSymbol) : Integer;
+begin
+   if not Find(anItem, Result) then
+      Result:=-1;
+end;
+
+// Clear
+//
+procedure TSortedDebugSymbols.Clear;
+begin
+   SetLength(FItems, 0);
+   FCount:=0;
+end;
+
+// Clean
+//
+procedure TSortedDebugSymbols.Clean;
+var
+   i : Integer;
+begin
+   for i:=0 to FCount-1 do
+      FItems[i].Free;
+   Clear;
+end;
+
+// Enumerate
+//
+procedure TSortedDebugSymbols.Enumerate(const callback : TSimpleCallbackDebugSymbol);
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if callback(FItems[i])=csAbort then
+         Break;
+end;
 
 function TSortedDebugSymbols.Compare(const item1, item2 : TDebugSymbol) : Integer;
 begin
@@ -6297,8 +7069,80 @@ end;
 //
 destructor TDataSymbolList.Destroy;
 begin
+   // TODO?: Check if the below is correct
    ExtractAll;
+   Clear;
    inherited;
+end;
+
+// GetItem
+//
+function TDataSymbolList.GetItem(index : Integer) : TDataSymbol;
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   Result:=FItems[index];
+end;
+
+// SetItem
+//
+procedure TDataSymbolList.SetItem(index : Integer; const item : TDataSymbol);
+begin
+   Assert(Cardinal(index)<Cardinal(FCount), 'Index out of range');
+   FItems[index]:=item;
+end;
+
+// Add
+//
+function TDataSymbolList.Add(const anItem : TDataSymbol) : Integer;
+begin
+   if Count=Length(FItems) then
+      SetLength(FItems, Count+8+(Count shr 4));
+   FItems[FCount]:=anItem;
+   Result:=FCount;
+   Inc(FCount);
+end;
+
+// IndexOf
+//
+function TDataSymbolList.IndexOf(const anItem : TDataSymbol) : Integer;
+var
+   i : Integer;
+begin
+   for i:=0 to Count-1 do
+      if FItems[i]=anItem then Exit(i);
+   Result:=-1;
+end;
+
+// Extract
+//
+function TDataSymbolList.Extract(idx : Integer) : TDataSymbol;
+var
+   n : Integer;
+begin
+   Assert(Cardinal(idx)<Cardinal(FCount), 'Index out of range');
+   n:=Count-1-idx;
+   Dec(FCount);
+   if n>0 then
+      System.Move(FItems[idx+1], FItems[idx], SizeOf(TDataSymbol)*n);
+   Result:=FItems[idx];
+end;
+
+// ExtractAll
+//
+procedure TDataSymbolList.ExtractAll;
+begin
+   FCount:=0;
+end;
+
+// Clear
+//
+procedure TDataSymbolList.Clear;
+var
+   i : Integer;
+begin
+   for i:=FCount-1 downto 0 do
+      FItems[i].Free;
+   FCount:=0;
 end;
 
 // ------------------
@@ -8364,7 +9208,7 @@ constructor TdwsJSCodeGenEnvironment.Create(codeGen : TdwsJSCodeGen; const custo
 begin
    FExec:=customExec;
    FCodeGen:=codeGen;
-   FIntercepts:=TSimpleNameObjectHash<TdwsJSCodeGenIntercepts>.Create;
+   FIntercepts:=TSimpleNameJSCodeGenInterceptsHash.Create;
    FCodeGen.OnCustomCodeGen:=DoCustomCodeGen;
    FMissedIntercepts:=TSimpleClassHash.Create;
 end;
@@ -8485,12 +9329,104 @@ end;
 // ------------------ TdwsJSCodeGenIntercepts ------------------
 // ------------------
 
+// Create
+//
+constructor TdwsJSCodeGenIntercepts.Create(initialCapacity : Integer = 0);
+begin
+   FHash:=TNameObjectHash.Create(initialCapacity);
+end;
+
 // Destroy
 //
 destructor TdwsJSCodeGenIntercepts.Destroy;
 begin
    Clean;
-   inherited;
+   FHash.Free;
+end;
+
+// Pack
+//
+procedure TdwsJSCodeGenIntercepts.Pack;
+begin
+   FHash.Pack;
+end;
+
+// GetIndex
+//
+function TdwsJSCodeGenIntercepts.GetIndex(const aName : UnicodeString) : Integer;
+begin
+   Result:=FHash.GetIndex(aName);
+end;
+
+// GetObjects
+//
+function TdwsJSCodeGenIntercepts.GetObjects(const aName : UnicodeString) : TdwsJSCodeGenIntercept;
+begin
+   Result:=TdwsJSCodeGenIntercept(FHash.GetObjects(aName));
+end;
+
+// SetObjects
+//
+procedure TdwsJSCodeGenIntercepts.SetObjects(const aName : UnicodeString; obj : TdwsJSCodeGenIntercept);
+begin
+   FHash.SetObjects(aName, obj);
+end;
+
+// AddObject
+//
+function TdwsJSCodeGenIntercepts.AddObject(const aName : UnicodeString; aObj : TdwsJSCodeGenIntercept;
+   replace : Boolean = False) : Boolean;
+begin
+   Result:=FHash.AddObject(aName, aObj, replace);
+end;
+
+// Clean
+//
+procedure TdwsJSCodeGenIntercepts.Clean;
+begin
+   FHash.Clean;
+end;
+
+// Clear
+//
+procedure TdwsJSCodeGenIntercepts.Clear;
+begin
+   FHash.Clear;
+end;
+
+// GetBucketName
+//
+function TdwsJSCodeGenIntercepts.GetBucketName(index : Integer) : String;
+begin
+   Result:=FHash.GetBucketName(index);
+end;
+
+// GetBucketObject
+//
+function TdwsJSCodeGenIntercepts.GetBucketObject(index : Integer) : TdwsJSCodeGenIntercept;
+begin
+   Result:=TdwsJSCodeGenIntercept(FHash.GetBucketObject(index));
+end;
+
+// SetBucketObject
+//
+procedure TdwsJSCodeGenIntercepts.SetBucketObject(index : Integer; obj : TdwsJSCodeGenIntercept);
+begin
+   FHash.SetBucketObject(index, obj);
+end;
+
+// Count
+//
+function TdwsJSCodeGenIntercepts.Count : Integer;
+begin
+   Result:=FHash.Count;
+end;
+
+// HighIndex
+//
+function TdwsJSCodeGenIntercepts.HighIndex : Integer;
+begin
+   Result:=FHash.HighIndex;
 end;
 
 // Match
@@ -8501,8 +9437,267 @@ begin
 end;
 
 // ------------------
+// ------------------ TSimpleNameJSCodeGenInterceptsHash ------------------
+// ------------------
+
+// Create
+//
+constructor TSimpleNameJSCodeGenInterceptsHash.Create(initialCapacity : Integer = 0);
+begin
+   FHash:=TNameObjectHash.Create(initialCapacity);
+end;
+
+// Destroy
+//
+destructor TSimpleNameJSCodeGenInterceptsHash.Destroy;
+begin
+   Clean;
+   FHash.Free;
+end;
+
+// Pack
+//
+procedure TSimpleNameJSCodeGenInterceptsHash.Pack;
+begin
+   FHash.Pack;
+end;
+
+// GetIndex
+//
+function TSimpleNameJSCodeGenInterceptsHash.GetIndex(const aName : UnicodeString) : Integer;
+begin
+   Result:=FHash.GetIndex(aName);
+end;
+
+// GetObjects
+//
+function TSimpleNameJSCodeGenInterceptsHash.GetObjects(const aName : UnicodeString) : TdwsJSCodeGenIntercepts;
+begin
+   Result:=TdwsJSCodeGenIntercepts(FHash.GetObjects(aName));
+end;
+
+// SetObjects
+//
+procedure TSimpleNameJSCodeGenInterceptsHash.SetObjects(const aName : UnicodeString; obj : TdwsJSCodeGenIntercepts);
+begin
+   FHash.SetObjects(aName, obj);
+end;
+
+// AddObject
+//
+function TSimpleNameJSCodeGenInterceptsHash.AddObject(const aName : UnicodeString; aObj : TdwsJSCodeGenIntercepts;
+   replace : Boolean = False) : Boolean;
+begin
+   Result:=FHash.AddObject(aName, aObj, replace);
+end;
+
+// Clean
+//
+procedure TSimpleNameJSCodeGenInterceptsHash.Clean;
+begin
+   FHash.Clean;
+end;
+
+// Clear
+//
+procedure TSimpleNameJSCodeGenInterceptsHash.Clear;
+begin
+   FHash.Clear;
+end;
+
+// GetBucketName
+//
+function TSimpleNameJSCodeGenInterceptsHash.GetBucketName(index : Integer) : String;
+begin
+   Result:=FHash.GetBucketName(index);
+end;
+
+// GetBucketObject
+//
+function TSimpleNameJSCodeGenInterceptsHash.GetBucketObject(index : Integer) : TdwsJSCodeGenIntercepts;
+begin
+   Result:=TdwsJSCodeGenIntercepts(FHash.GetBucketObject(index));
+end;
+
+// SetBucketObject
+//
+procedure TSimpleNameJSCodeGenInterceptsHash.SetBucketObject(index : Integer; obj : TdwsJSCodeGenIntercepts);
+begin
+   FHash.SetBucketObject(index, obj);
+end;
+
+// Count
+//
+function TSimpleNameJSCodeGenInterceptsHash.Count : Integer;
+begin
+   Result:=FHash.Count;
+end;
+
+// HighIndex
+//
+function TSimpleNameJSCodeGenInterceptsHash.HighIndex : Integer;
+begin
+   Result:=FHash.HighIndex;
+end;
+
+// ------------------
 // ------------------ TSimpleClassHash ------------------
 // ------------------
+
+// Grow
+//
+procedure TSimpleClassHash.Grow;
+var
+   i, j, n : Integer;
+   oldBuckets : array of TSimpleHashClassBucket;
+begin
+   if FCapacity=0 then
+      FCapacity:=32
+   else FCapacity:=FCapacity*2;
+   FGrowth:=(FCapacity*11) div 16;
+
+   SetLength(oldBuckets, Length(FBuckets));
+   for i := 0 to Length(FBuckets) - 1 do
+     oldBuckets[i] := FBuckets[i];
+
+   FBuckets:=nil;
+   SetLength(FBuckets, FCapacity);
+
+   n:=FCapacity-1;
+   for i:=0 to High(oldBuckets) do begin
+      if oldBuckets[i].HashCode=0 then continue;
+      j:=(oldBuckets[i].HashCode and (FCapacity-1));
+      while FBuckets[j].HashCode<>0 do
+         j:=(j+1) and n;
+      FBuckets[j]:=oldBuckets[i];
+   end;
+end;
+
+// LinearFind
+//
+function TSimpleClassHash.LinearFind(const item : TClass; var index : Integer) : Boolean;
+begin
+   repeat
+      if FBuckets[index].HashCode=0 then
+         Exit(False)
+      else if SameItem(item, FBuckets[index].Value) then
+         Exit(True);
+      index:=(index+1) and (FCapacity-1);
+   until False;
+end;
+
+// Add
+//
+function TSimpleClassHash.Add(const anItem : TClass) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then Exit(False);
+   FBuckets[i].HashCode:=hashCode;
+   FBuckets[i].Value:=anItem;
+   Inc(FCount);
+   Result:=True;
+end;
+
+// Replace
+//
+function TSimpleClassHash.Replace(const anItem : TClass) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   Result := False;
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].Value:=anItem
+   end else begin
+      FBuckets[i].HashCode:=hashCode;
+      FBuckets[i].Value:=anItem;
+      Inc(FCount);
+      Result:=True;
+   end;
+end;
+
+// Remove
+//
+function TSimpleClassHash.Remove(const anItem : TClass) : Boolean;
+var
+   i : Integer;
+   hashCode : Integer;
+begin
+   if FCount>=FGrowth then Grow;
+
+   hashCode:=GetItemHashCode(anItem);
+   i:=(hashCode and (FCapacity-1));
+   if LinearFind(anItem, i) then begin
+      FBuckets[i].HashCode:=0;
+      FBuckets[i].Value:=Default(TClass);
+      Dec(FCount);
+      Result:=True;
+   end else begin
+      Result:=False;
+   end;
+end;
+
+// Contains
+//
+function TSimpleClassHash.Contains(const anItem : TClass) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+end;
+
+// Match
+//
+function TSimpleClassHash.Match(var anItem : TClass) : Boolean;
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit(False);
+   i:=(GetItemHashCode(anItem) and (FCapacity-1));
+   Result:=LinearFind(anItem, i);
+   if Result then
+      anItem:=FBuckets[i].Value;
+end;
+
+// Enumerate
+//
+procedure TSimpleClassHash.Enumerate(callBack : TSimpleHashClassFunc);
+var
+   i : Integer;
+begin
+   if FCount=0 then Exit;
+   for i:=0 to High(FBuckets) do begin
+      if FBuckets[i].HashCode<>0 then begin
+         if callBack(FBuckets[i].Value)=shaRemove then begin
+            FBuckets[i].HashCode:=0;
+            FBuckets[i].Value:=Default(TClass);
+            Dec(FCount);
+         end;
+      end;
+   end;
+end;
+
+// Clear
+//
+procedure TSimpleClassHash.Clear;
+begin
+   FCount:=0;
+   FCapacity:=0;
+   FGrowth:=0;
+   FBuckets:=nil;
+end;
 
 // SameItem
 //

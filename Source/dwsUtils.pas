@@ -283,12 +283,11 @@ type
    //
    {: A simple generic object list, owns objects }
    TObjectList<T{$IFNDEF FPC}: TRefCountedObject{$ENDIF}> = class
+      type
+         ArrayT = array of T;
       private
-         type
-            ArrayT = array of T;
-         var
-            FItems : ArrayT;
-            FCount : Integer;
+        FItems : ArrayT;
+        FCount : Integer;
 
       protected
          function GetItem(index : Integer) : T; {$IFDEF DELPHI_2010_MINUS}{$ELSE} inline; {$ENDIF}
@@ -309,12 +308,11 @@ type
    //
    {: List that maintains its elements sorted, subclasses must override Compare }
    TSortedList<T{$IFNDEF FPC}: TRefCountedObject{$ENDIF}> = class
+      type
+         ArrayT = array of T;
       private
-         type
-            ArrayT = array of T;
-         var
-            FItems : ArrayT;
-            FCount : Integer;
+         FItems : ArrayT;
+         FCount : Integer;
 
       protected
          function GetItem(index : Integer) : T;
