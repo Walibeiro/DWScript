@@ -181,7 +181,7 @@ function UnicodeUpperCase(const s : UnicodeString) : UnicodeString;
 function ASCIICompareText(const s1, s2 : UnicodeString) : Integer; inline;
 function ASCIISameText(const s1, s2 : UnicodeString) : Boolean; inline;
 
-function NormalizeString(const s, form : UnicodeString) : String;
+function NormalizeString(const s, form : UnicodeString) : UnicodeString;
 
 function InterlockedIncrement(var val : Integer) : Integer; overload; {$IFDEF PUREPASCAL} inline; {$endif}
 function InterlockedDecrement(var val : Integer) : Integer; {$IFDEF PUREPASCAL} inline; {$endif}
@@ -218,7 +218,7 @@ procedure SaveDataToFile(const fileName : UnicodeString; const data : TBytes);
 function LoadRawBytesFromFile(const fileName : UnicodeString) : RawByteString;
 function SaveRawBytesToFile(const fileName : UnicodeString; const data : RawByteString) : Integer;
 
-procedure LoadRawBytesAsScriptStringFromFile(const fileName : UnicodeString; var result : String);
+procedure LoadRawBytesAsScriptStringFromFile(const fileName : UnicodeString; var result : UnicodeString);
 
 function LoadTextFromBuffer(const buf : TBytes) : UnicodeString;
 function LoadTextFromRawBytes(const buf : RawByteString) : UnicodeString;
@@ -234,8 +234,8 @@ function FileCopy(const existing, new : UnicodeString; failIfExists : Boolean) :
 function FileMove(const existing, new : UnicodeString) : Boolean;
 function FileDelete(const fileName : String) : Boolean;
 function FileRename(const oldName, newName : String) : Boolean;
-function FileSize(const name : String) : Int64;
-function FileDateTime(const name : String) : TDateTime;
+function FileSize(const name : UnicodeString) : Int64;
+function FileDateTime(const name : UnicodeString) : TDateTime;
 procedure FileSetDateTime(hFile : THandle; aDateTime : TDateTime);
 function DeleteDirectory(const path : String) : Boolean;
 
@@ -244,7 +244,7 @@ function DirectSetMXCSR(newValue : Word) : Word; register;
 
 function SwapBytes(v : Cardinal) : Cardinal;
 
-function GetCurrentUserName : String;
+function GetCurrentUserName : UnicodeString;
 
 {$ifndef FPC}
 // Generics helper functions to handle Delphi 2009 issues - HV
@@ -495,9 +495,10 @@ end;
 // NormalizeString
 //
 function APINormalizeString(normForm : Integer; lpSrcString : LPCWSTR; cwSrcLength : Integer;
-                            lpDstString : LPWSTR; cwDstLength : Integer) : Integer;
-                            stdcall; external 'Normaliz.dll' name 'NormalizeString' {$IFNDEF FPC}delayed{$ENDIF};
-function NormalizeString(const s, form : UnicodeString) : String;
+  lpDstString : LPWSTR; cwDstLength : Integer) : Integer; stdcall;
+  external 'Normaliz.dll' name 'NormalizeString' {$IFNDEF FPC}delayed{$ENDIF};
+
+function NormalizeString(const s, form : UnicodeString) : UnicodeString;
 var
    nf, len : Integer;
 begin
@@ -700,7 +701,9 @@ type
    end;
 
 {$IFDEF FPC}
-function FindFirstFileEx(lpfilename : LPCStr;fInfoLevelId:FINDEX_INFO_LEVELS ;lpFindFileData:pointer;fSearchOp : FINDEX_SEARCH_OPS;lpSearchFilter:pointer;dwAdditionalFlags:dword):Handle; stdcall; external name 'FindFirstFileExW';
+function FindFirstFileEx(lpfilename : LPCStr; fInfoLevelId : FINDEX_INFO_LEVELS;
+   lpFindFileData : pointer; fSearchOp : FINDEX_SEARCH_OPS; lpSearchFilter : pointer;
+   dwAdditionalFlags : dword):Handle; stdcall; external kernel32 name 'FindFirstFileExW';
 {$ENDIF}
 
 // CollectFilesMasked
@@ -715,7 +718,7 @@ const
 var
    searchRec : TFindDataRec;
    infoLevel : TFindexInfoLevels;
-   fileName : String;
+   fileName : UnicodeString;
    skipScan : Boolean;
 begin
    // 6.1 required for FindExInfoBasic (Win 2008 R2 or Win 7)
@@ -1031,7 +1034,7 @@ end;
 
 // LoadRawBytesAsScriptStringFromFile
 //
-procedure LoadRawBytesAsScriptStringFromFile(const fileName : UnicodeString; var result : String);
+procedure LoadRawBytesAsScriptStringFromFile(const fileName : UnicodeString; var result : UnicodeString);
 const
    INVALID_FILE_SIZE = DWORD($FFFFFFFF);
 var
@@ -1165,7 +1168,7 @@ end;
 
 // FileSize
 //
-function FileSize(const name : String) : Int64;
+function FileSize(const name : UnicodeString) : Int64;
 var
    info : TWin32FileAttributeData;
 begin
@@ -1176,7 +1179,7 @@ end;
 
 // FileDateTime
 //
-function FileDateTime(const name : String) : TDateTime;
+function FileDateTime(const name : UnicodeString) : TDateTime;
 var
    info : TWin32FileAttributeData;
    localTime : TFileTime;
@@ -1267,7 +1270,7 @@ end;
 
 // GetCurrentUserName
 //
-function GetCurrentUserName : String;
+function GetCurrentUserName : UnicodeString;
 var
 	len : Cardinal;
 begin

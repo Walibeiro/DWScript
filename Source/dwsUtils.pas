@@ -57,7 +57,7 @@ type
    IGetSelf = interface
       ['{77D8EA0B-311C-422B-B8DE-AA5BDE726E41}']
       function GetSelf : TObject;
-      function ToString : String;
+      function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF};
    end;
 
    // TInterfacedSelfObject
@@ -883,7 +883,7 @@ type
          procedure WriteDigits(value : Int64; digits : Integer);
 
          // assumes data is an utf16 UnicodeString, spits out utf8 in FPC, utf16 in Delphi
-         function ToString : String; override;
+         function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF}; override;
          function ToUTF8String : RawByteString;
          function ToBytes : TBytes;
          function ToRawBytes : RawByteString;
@@ -902,7 +902,7 @@ type
       procedure WriteChar(utf16Char : WideChar);
       procedure WriteCRLF;
 
-      function ToString : String;
+      function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF};
    end;
 
    TAutoWriteOnlyBlockStream = class (TInterfacedSelfObject, IWriteOnlyBlockStream)
@@ -920,7 +920,7 @@ type
          constructor Create;
          destructor Destroy; override;
 
-         function ToString : String; override;
+         function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF}; override;
    end;
 
    TSimpleInt64List = class(TSimpleListInt64)
@@ -977,7 +977,7 @@ type
 
    TFastCompareStringList = class (TStringList)
       {$ifdef FPC}
-      function DoCompareText(const s1,s2 : string) : PtrInt; override;
+      function DoCompareText(const s1,s2 : AnsiString) : PtrInt; override;
       {$else}
       function CompareStrings(const S1, S2: UnicodeString): Integer; override;
       function IndexOfName(const name : UnicodeString): Integer; override;
@@ -986,7 +986,7 @@ type
 
    TFastCompareTextList = class (TStringList)
       {$ifdef FPC}
-      function DoCompareText(const s1,s2 : string) : PtrInt; override;
+      function DoCompareText(const s1,s2 : AnsiString) : PtrInt; override;
       {$else}
       function CompareStrings(const S1, S2: UnicodeString): Integer; override;
       function FindName(const name : UnicodeString; var index : Integer) : Boolean;
@@ -994,6 +994,7 @@ type
       {$endif}
    end;
 
+(*
    TClassCloneConstructor<T: TRefCountedObject> = record
       private
          FTemplate : T;
@@ -1003,6 +1004,7 @@ type
          procedure Finalize;
          function Create : T; inline;
    end;
+*)
 
    ETightListOutOfBound = class(Exception)
    end;
@@ -1140,8 +1142,8 @@ procedure BytesToScriptString(const p : PByte; n : Integer; var result : Unicode
 function ScriptStringToRawByteString(const s : UnicodeString) : RawByteString; overload; inline;
 procedure ScriptStringToRawByteString(const s : UnicodeString; var result : RawByteString); overload;
 
-procedure StringBytesToWords(var buf : String; swap : Boolean);
-procedure StringWordsToBytes(var buf : String; swap : Boolean);
+procedure StringBytesToWords(var buf : UnicodeString; swap : Boolean);
+procedure StringWordsToBytes(var buf : UnicodeString; swap : Boolean);
 
 function BinToHex(const data; n : Integer) : String; overload;
 function BinToHex(const data : RawByteString) : String; overload; inline;
@@ -1336,7 +1338,7 @@ end;
 
 // StringBytesToWords
 //
-procedure StringBytesToWords(var buf : String; swap : Boolean);
+procedure StringBytesToWords(var buf : UnicodeString; swap : Boolean);
 type
    TTwoBytes = array [0..1] of Byte;
    TTwoWords = array [0..1] of Word;
@@ -1348,8 +1350,8 @@ begin
    n := Length(buf);
    if n > 0 then begin
       SetLength(buf, 2*n);
-      pSrc := @PChar(Pointer(buf))[n-1];
-      pDest := @PChar(Pointer(buf))[2*n-2];
+      pSrc := @PWideChar(Pointer(buf))[n-1];
+      pDest := @PWideChar(Pointer(buf))[2*n-2];
       if swap then begin
          for i := 1 to n do begin
             pDest[1] := pSrc[0];
@@ -1370,7 +1372,7 @@ end;
 
 // StringWordsToBytes
 //
-procedure StringWordsToBytes(var buf : String; swap : Boolean);
+procedure StringWordsToBytes(var buf : UnicodeString; swap : Boolean);
 type
    TTwoBytes = array [0..1] of Byte;
    TTwoWords = array [0..1] of Word;
@@ -4361,7 +4363,7 @@ var
 begin
    {$ifdef FPC}
    if utf16String<>'' then
-      TODO: Check if the code below is correct
+      // TODO: Check if the code below is correct
       WriteBuf(@utf16String[1], Length(utf16String)*SizeOf(WideChar));
    {$else}
    stringCracker:=NativeUInt(utf16String);
@@ -6049,6 +6051,7 @@ begin
    FChunk.Data[FChunkIndex]:=item;
 end;
 
+(*
 // ------------------
 // ------------------ TClassCloneConstructor<T> ------------------
 // ------------------
@@ -6081,6 +6084,7 @@ begin
    Move(TtoPointer(FTemplate)^, TtoPointer(Result)^, FSize);
    {$endif}
 end;
+*)
 
 // ------------------
 // ------------------ TQuickSort ------------------

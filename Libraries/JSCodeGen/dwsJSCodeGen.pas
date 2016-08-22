@@ -6216,6 +6216,20 @@ end;
 procedure TJSInOpExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
    e : TInOpExpr;
+
+{$IFDEF FPC}
+   procedure WriteV;
+   begin
+      codegen.WriteString('v$');
+   end;
+
+   procedure WriteLeft;
+   begin
+      codegen.Compile(e.Left)
+   end;
+{$ENDIF}
+
+var
    i : Integer;
    cond : TCaseCondition;
    wrapped, allConstantCompares : Boolean;
@@ -6254,9 +6268,17 @@ begin
       end;
 
       codeGen.WriteString('function(v$){return ');
+      {$IFDEF FPC}
+      writeOperand:=@WriteV;
+      {$ELSE}
       writeOperand:=procedure begin codegen.WriteString('v$') end;
+      {$ENDIF}
    end else begin
+      {$IFDEF FPC}
+      writeOperand:=@WriteLeft;
+      {$ELSE}
       writeOperand:=procedure begin codegen.Compile(e.Left) end;
+      {$ENDIF}
    end;
 
    if e.Count>1 then
@@ -6421,12 +6443,21 @@ end;
 //
 procedure TJSCaseExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
+   tmp : String;
+
+{$IFDEF FPC}
+   procedure WriteTemp;
+   begin
+      codeGen.WriteString(tmp)
+   end;
+{$ENDIF}
+
+var
    i, j : Integer;
    e : TCaseExpr;
    cond : TCaseCondition;
    compCond, compCondOther : TCompareCaseCondition;
    mark : array of Boolean;
-   tmp : String;
    valType : TTypeSymbol;
    switchable : Boolean;
    checkBreak : IRecursiveHasSubExprClass;
@@ -6504,7 +6535,11 @@ begin
             codeGen.WriteString(' else ');
          codeGen.WriteString('if (');
          cond:=TCaseCondition(e.CaseConditions.List[i]);
+         {$IFDEF FPC}
+         CodeGenCondition(codeGen, cond, @WriteTemp);
+         {$ELSE}
          CodeGenCondition(codeGen, cond, procedure begin codeGen.WriteString(tmp) end);
+         {$ENDIF}
          codeGen.WriteBlockBegin(') ');
          codeGen.Compile(cond.TrueExpr);
          codeGen.WriteBlockEndLn;

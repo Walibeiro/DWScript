@@ -488,11 +488,141 @@ implementation
 // ------------------------------------------------------------------
 // ------------------------------------------------------------------
 
+type
+   TClassCloneConstructorJSONImmediate = record
+      private
+         FTemplate : TdwsJSONImmediate;
+         FSize : Integer;
+      public
+         procedure Initialize(aTemplate : TdwsJSONImmediate);
+         procedure Finalize;
+         function Create : TdwsJSONImmediate; inline;
+   end;
+
+   TClassCloneConstructorJSONObject = record
+      private
+         FTemplate : TdwsJSONObject;
+         FSize : Integer;
+      public
+         procedure Initialize(aTemplate : TdwsJSONObject);
+         procedure Finalize;
+         function Create : TdwsJSONObject; inline;
+   end;
+
+   TClassCloneConstructorJSONArray = record
+      private
+         FTemplate : TdwsJSONArray;
+         FSize : Integer;
+      public
+         procedure Initialize(aTemplate : TdwsJSONArray);
+         procedure Finalize;
+         function Create : TdwsJSONArray; inline;
+   end;
+
 var
    vJSONFormatSettings : TFormatSettings;
-   vImmediate : TClassCloneConstructor<TdwsJSONImmediate>;
-   vObject : TClassCloneConstructor<TdwsJSONObject>;
-   vArray : TClassCloneConstructor<TdwsJSONArray>;
+   vImmediate : TClassCloneConstructorJSONImmediate;
+   vObject : TClassCloneConstructorJSONObject;
+   vArray : TClassCloneConstructorJSONArray;
+
+// ------------------
+// ------------------ TClassCloneConstructorJSONImmediate ------------------
+// ------------------
+
+// Initialize
+//
+procedure TClassCloneConstructorJSONImmediate.Initialize(aTemplate : TdwsJSONImmediate);
+begin
+   FTemplate:=aTemplate;
+   FSize:= FTemplate.InstanceSize;
+end;
+
+// Finalize
+//
+procedure TClassCloneConstructorJSONImmediate.Finalize;
+begin
+   FTemplate.Free;
+   TObject(FTemplate):=nil; // D2010 bug workaround
+end;
+
+// Create
+//
+function TClassCloneConstructorJSONImmediate.Create : TdwsJSONImmediate;
+begin
+   {$ifdef FPC}
+   System.GetMem(Pointer(Result), FSize);
+   System.Move(Pointer(FTemplate)^, Pointer(Result)^, FSize);
+   {$else}
+   GetMemForT(Result, FSize);
+   Move(TtoPointer(FTemplate)^, TtoPointer(Result)^, FSize);
+   {$endif}
+end;
+
+// ------------------
+// ------------------ TClassCloneConstructorJSONObject ------------------
+// ------------------
+
+// Initialize
+//
+procedure TClassCloneConstructorJSONObject.Initialize(aTemplate : TdwsJSONObject);
+begin
+   FTemplate:=aTemplate;
+   FSize:= FTemplate.InstanceSize;
+end;
+
+// Finalize
+//
+procedure TClassCloneConstructorJSONObject.Finalize;
+begin
+   FTemplate.Free;
+   TObject(FTemplate):=nil; // D2010 bug workaround
+end;
+
+// Create
+//
+function TClassCloneConstructorJSONObject.Create : TdwsJSONObject;
+begin
+   {$ifdef FPC}
+   System.GetMem(Pointer(Result), FSize);
+   System.Move(Pointer(FTemplate)^, Pointer(Result)^, FSize);
+   {$else}
+   GetMemForT(Result, FSize);
+   Move(TtoPointer(FTemplate)^, TtoPointer(Result)^, FSize);
+   {$endif}
+end;
+
+// ------------------
+// ------------------ TClassCloneConstructorJSONArray ------------------
+// ------------------
+
+// Initialize
+//
+procedure TClassCloneConstructorJSONArray.Initialize(aTemplate : TdwsJSONArray);
+begin
+   FTemplate:=aTemplate;
+   FSize:= FTemplate.InstanceSize;
+end;
+
+// Finalize
+//
+procedure TClassCloneConstructorJSONArray.Finalize;
+begin
+   FTemplate.Free;
+   TObject(FTemplate):=nil; // D2010 bug workaround
+end;
+
+// Create
+//
+function TClassCloneConstructorJSONArray.Create : TdwsJSONArray;
+begin
+   {$ifdef FPC}
+   System.GetMem(Pointer(Result), FSize);
+   System.Move(Pointer(FTemplate)^, Pointer(Result)^, FSize);
+   {$else}
+   GetMemForT(Result, FSize);
+   Move(TtoPointer(FTemplate)^, TtoPointer(Result)^, FSize);
+   {$endif}
+end;
 
 // ------------------
 // ------------------ TdwsJSONParserState ------------------

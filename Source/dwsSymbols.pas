@@ -7546,7 +7546,11 @@ end;
 constructor TdwsExecution.Create(const stackParams : TStackParameters);
 begin
    inherited Create;
+{$IFDEF FPC}
+   FStack := TStackMixIn.Create(stackParams);
+{$ELSE}
    FStack.Initialize(stackParams);
+{$ENDIF}
    FStack.Reset;
    FExceptionObjectStack:=TSimpleStackIScriptObj.Create;
    FRandSeed:=cDefaultRandSeed xor (UInt64(System.Random($7FFFFFFF)) shl 15);
@@ -7558,7 +7562,11 @@ destructor TdwsExecution.Destroy;
 begin
    Assert(not Assigned(FSelfScriptObject));
    FExceptionObjectStack.Free;
+{$IFDEF FPC}
+   FStack.Free;
+{$ELSE}
    FStack.Finalize;
+{$ENDIF}
    FCallStack.Free;
    FFormatSettings.Free;
    inherited;

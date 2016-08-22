@@ -40,7 +40,7 @@ type
    // TStackMixIn
    //
    TStack = ^TStackMixIn;
-   TStackMixIn = record
+   TStackMixIn = {$IFDEF FPC} class {$ELSE} record {$ENDIF}
       private
          FBaseData : PDataArray;
          FBasePointer : Integer;
@@ -61,9 +61,13 @@ type
          function GetPData : PData;
 
       public
-
+         {$IFDEF FPC}
+         constructor Create(const params : TStackParameters);
+         destructor Destroy;
+         {$ELSE}
          procedure Initialize(const params : TStackParameters);
          procedure Finalize;
+         {$ENDIF}
 
          procedure Push(delta : Integer); inline;
          procedure Pop(delta : Integer); inline;
@@ -153,6 +157,28 @@ implementation
 // ------------------ TStackMixIn ------------------
 // ------------------
 
+{$IFDEF FPC}
+// Create
+//
+constructor TStackMixIn.Create(const params : TStackParameters);
+begin
+   FParams:=params;
+   FMaxSize:=params.MaxByteSize div SizeOf(Variant);
+   FDataPtrPool:=TDataContextPool.Create;
+end;
+
+// Destroy
+//
+destructor TStackMixIn.Destroy;
+begin
+   ClearBpStore;
+   FDataPtrPool.Cleanup;
+   FDataPtrPool:=nil;
+   inherited;
+end;
+
+{$ELSE}
+
 // Initialize
 //
 procedure TStackMixIn.Initialize(const params : TStackParameters);
@@ -162,7 +188,7 @@ begin
    FDataPtrPool:=TDataContextPool.Create;
 end;
 
-// Destroy
+// Finalize
 //
 procedure TStackMixIn.Finalize;
 begin
@@ -170,6 +196,8 @@ begin
    FDataPtrPool.Cleanup;
    FDataPtrPool:=nil;
 end;
+
+{$ENDIF}
 
 // ClearBpStore
 //
