@@ -57,7 +57,7 @@ type
          procedure CreateSystemSymbols(table : TSystemSymbolTable); override;
          function StaticSymbols : Boolean; override;
          function ReadInstr(compiler : TdwsCompiler) : TNoResultExpr; override;
-         function RootExternalClass(compiler : TdwsCompiler; const externalName : String) : TClassSymbol; override;
+         function RootExternalClass(compiler : TdwsCompiler; const externalName : UnicodeString) : TClassSymbol; override;
          procedure ApplyConditionalDefines(defines : TStrings); override;
 
          property SymbolMarker : TTokenType read FSymbolMarker write FSymbolMarker;
@@ -100,16 +100,16 @@ type
          FTable : TSymbolTable;
 
       protected
-         function ConnectorCaption : String;
+         function ConnectorCaption : UnicodeString;
          function AutoVarParams : Boolean;
          function AcceptsParams(const params : TConnectorParamArray) : Boolean;
          function WritableReads(const memberName : UnicodeString) : Boolean;
 
-         function HasMethod(const methodName : String; const params : TConnectorParamArray;
+         function HasMethod(const methodName : UnicodeString; const params : TConnectorParamArray;
                             var typSym : TTypeSymbol) : IConnectorCall;
-         function HasMember(const memberName : String; var typSym : TTypeSymbol;
+         function HasMember(const memberName : UnicodeString; var typSym : TTypeSymbol;
                             isWrite : Boolean) : IConnectorMember;
-         function HasIndex(const propName : String; const params : TConnectorParamArray;
+         function HasIndex(const propName : UnicodeString; const params : TConnectorParamArray;
                            var typSym : TTypeSymbol; isWrite : Boolean) : IConnectorCall;
          function HasEnumerator(var typSym: TTypeSymbol) : IConnectorEnumerator;
          function HasCast(typSym: TTypeSymbol) : IConnectorCast;
@@ -225,9 +225,9 @@ end;
 function TdwsJSLanguageExtension.ReadInstr(compiler : TdwsCompiler) : TNoResultExpr;
 var
    tok : TTokenizer;
-   startPos : PChar;
+   startPos : PWideChar;
    hotPos : TScriptPos;
-   jsCode, name : String;
+   jsCode, name : UnicodeString;
    sym : TSymbol;
    table : TSymbolTable;
    blockExpr : TdwsJSBlockExpr;
@@ -335,7 +335,7 @@ end;
 
 // RootExternalClass
 //
-function TdwsJSLanguageExtension.RootExternalClass(compiler : TdwsCompiler; const externalName : String) : TClassSymbol;
+function TdwsJSLanguageExtension.RootExternalClass(compiler : TdwsCompiler; const externalName : UnicodeString) : TClassSymbol;
 begin
    Result:=compiler.CurrentProg.Root.SystemTable.SymbolTable.FindTypeLocal(SYS_JOBJECT) as TClassSymbol;
 end;
@@ -456,7 +456,7 @@ end;
 
 // ConnectorCaption
 //
-function TdwsJSConnectorType.ConnectorCaption : String;
+function TdwsJSConnectorType.ConnectorCaption : UnicodeString;
 begin
    Result:='JS Connector 1.0';
 end;
@@ -484,8 +484,8 @@ end;
 
 // HasMethod
 //
-function TdwsJSConnectorType.HasMethod(const methodName : String; const params : TConnectorParamArray;
-                                       var typSym : TTypeSymbol) : IConnectorCall;
+function TdwsJSConnectorType.HasMethod(const methodName : UnicodeString;
+   const params : TConnectorParamArray; var typSym : TTypeSymbol) : IConnectorCall;
 begin
    typSym:=FTable.FindTypeSymbol(SYS_VARIANT, cvMagic);
    Result:=TdwsJSConnectorCall.Create(methodName);
@@ -493,8 +493,8 @@ end;
 
 // HasMember
 //
-function TdwsJSConnectorType.HasMember(const memberName : String; var typSym : TTypeSymbol;
-                                       isWrite : Boolean) : IConnectorMember;
+function TdwsJSConnectorType.HasMember(const memberName : UnicodeString;
+      var typSym : TTypeSymbol; isWrite : Boolean) : IConnectorMember;
 begin
    typSym:=FTable.FindTypeSymbol(SYS_VARIANT, cvMagic);
    Result:=TdwsJSConnectorMember.Create(memberName);
@@ -502,8 +502,8 @@ end;
 
 // HasIndex
 //
-function TdwsJSConnectorType.HasIndex(const propName : String; const params : TConnectorParamArray;
-                                      var typSym : TTypeSymbol; isWrite : Boolean) : IConnectorCall;
+function TdwsJSConnectorType.HasIndex(const propName : UnicodeString;
+   const params : TConnectorParamArray; var typSym : TTypeSymbol; isWrite : Boolean) : IConnectorCall;
 begin
    typSym:=FTable.FindTypeSymbol(SYS_VARIANT, cvMagic);
    Result:=TdwsJSIndexCall.Create(propName, isWrite);

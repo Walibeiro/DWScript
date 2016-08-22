@@ -230,7 +230,11 @@ type
    end;
 
    TdwsSymbolDictionaryProc = procedure (sym : TSymbol) of object;
+{$IFDEF FPC}
+   TdwsSymbolDictionaryRef = procedure (sym : TSymbol);
+{$ELSE}
    TdwsSymbolDictionaryRef = reference to procedure (sym : TSymbol);
+{$ENDIF}
 
    { List all symbols in the script. Each symbol list contains a list of the
      positions where it was used. }
@@ -8720,22 +8724,22 @@ var
 begin
    writer.BeginObject;
 
-   writer.WriteName('Token');
+   writer.WriteName(UnicodeString('Token'));
    writer.WriteString(GetEnumName(TypeInfo(TTokenType), Ord(Token)));
 
-   writer.WriteName('Symbol');
+   writer.WriteName(UnicodeString('Symbol'));
    if ParentSym=nil then
       writer.WriteNull
    else begin
       writer.BeginObject;
-      writer.WriteName('Class');
+      writer.WriteName(UnicodeString('Class'));
       writer.WriteString(ParentSym.ClassName);
-      writer.WriteName('Name');
+      writer.WriteName(UnicodeString('Name'));
       writer.WriteString(ParentSym.Name);
       writer.EndObject;
    end;
 
-   writer.WriteName('SubContexts');
+   writer.WriteName(UnicodeString('SubContexts'));
    writer.BeginArray;
    for i:=0 to Count-1 do
       SubContext[i].WriteToJSON(writer);

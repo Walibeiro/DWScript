@@ -692,7 +692,12 @@ begin
       obj:=intf.Instance;
       if not obj.ClassSym.IsCompatible(FTyp) then
          RaiseIntfCastFailed(obj);
-   end else VarCopySafe(Result, nil);
+   end else
+{$IFDEF FPC}
+     VarCopySafe(Result, Variant(nil));
+{$ELSE}
+     VarCopySafe(Result, nil);
+{$ENDIF}
 end;
 
 // ------------------

@@ -153,7 +153,10 @@ implementation
 // ------------------------------------------------------------------
 // ------------------------------------------------------------------
 
-{$R dwsJSRTL.res dwsJSRTL.rc}
+{$IFNDEF FPC}
+   // TODO: Currently the resource must be linked by other means in FPC
+   {$R dwsJSRTL.res dwsJSRTL.rc}
+{$ENDIF}
 
 const
    cJSRTLDependencies : array [1..260] of TJSRTLDependency = (
@@ -1764,7 +1767,7 @@ end;
 procedure TJSGetTextFuncExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
    e : TMagicFuncExpr;
-   s : String;
+   s : UnicodeString;
 begin
    e := TMagicFuncExpr(expr);
 
@@ -1811,7 +1814,7 @@ procedure TJSFormatExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
    e : TMagicFuncExpr;
    openArgs : TArrayConstantExpr;
-   buf : String;
+   buf : UnicodeString;
    splitInfos : TFormatSplitInfos;
    elem : TTypedExpr;
    si : TFormatSplitInfo;

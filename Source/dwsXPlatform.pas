@@ -496,7 +496,7 @@ end;
 //
 function APINormalizeString(normForm : Integer; lpSrcString : LPCWSTR; cwSrcLength : Integer;
                             lpDstString : LPWSTR; cwDstLength : Integer) : Integer;
-                            stdcall; external 'Normaliz.dll' name 'NormalizeString' delayed;
+                            stdcall; external 'Normaliz.dll' name 'NormalizeString' {$IFNDEF FPC}delayed{$ENDIF};
 function NormalizeString(const s, form : UnicodeString) : String;
 var
    nf, len : Integer;
@@ -698,6 +698,10 @@ type
       Handle : THandle;
       Data : TWin32FindData;
    end;
+
+{$IFDEF FPC}
+function FindFirstFileEx(lpfilename : LPCStr;fInfoLevelId:FINDEX_INFO_LEVELS ;lpFindFileData:pointer;fSearchOp : FINDEX_SEARCH_OPS;lpSearchFilter:pointer;dwAdditionalFlags:dword):Handle; stdcall; external name 'FindFirstFileExW';
+{$ENDIF}
 
 // CollectFilesMasked
 //
@@ -1565,7 +1569,12 @@ class function TTimerTimeout.Create(delayMSec : Cardinal; onTimer : TTimerEvent)
 var
    obj : TTimerTimeout;
 begin
+{$IFDEF FPC}
+   // TODO: Check if the code below is correct
+   obj := TTimerTimeout(inherited Create);
+{$ELSE}
    obj := inherited Create;
+{$ENDIF}
    Result := obj;
    obj.FOnTimer := onTimer;
    CreateTimerQueueTimer(obj.FTimer, 0, TTimerTimeoutCallBack, obj,

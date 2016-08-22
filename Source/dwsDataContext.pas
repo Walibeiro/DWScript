@@ -325,10 +325,18 @@ begin
          n := 8;
       end;
       varUString : begin
+         {$IFDEF FPC}
+         // TODO: check if the below is c
+         if p.VString <> nil then begin
+            buf := SimpleStringHash(String(p.VString));
+            k := @buf;
+         end;
+         {$ELSE}
          if p.VUString <> nil then begin
             buf := SimpleStringHash(String(p.VUString));
             k := @buf;
          end;
+         {$ENDIF}
          n := 4;
       end;
       varString : begin

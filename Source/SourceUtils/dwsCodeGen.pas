@@ -2265,7 +2265,7 @@ end;
 //
 procedure TdwsCodeGen.WriteInteger(v : Int64);
 var
-   s : String;
+   s : UnicodeString;
 begin
    FastInt64ToStr(v, s);
    WriteString(s);

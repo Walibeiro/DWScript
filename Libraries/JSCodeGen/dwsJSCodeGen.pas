@@ -676,10 +676,14 @@ type
       procedure CodeGen(codeGen : TdwsCodeGen; expr : TExprBase); override;
    end;
 
+   {$IFDEF FPC}
+   TProc = procedure;
+   {$ENDIF}
+
    TJSCaseExpr = class (TJSExprCodeGen)
       procedure CodeGen(codeGen : TdwsCodeGen; expr : TExprBase); override;
       class procedure CodeGenCondition(codeGen : TdwsCodeGen; cond : TCaseCondition;
-                                       const writeOperand : TProc); static;
+         const writeOperand : TProc); static;
    end;
 
    TJSObjAsClassExpr = class (TJSExprCodeGen)
@@ -3161,7 +3165,12 @@ var
       try
          SetLength(buf, rs.Size);
          rs.Read(buf[1], rs.Size);
+{$IFDEF FPC}
+         // TODO: Review if the below translation is correct, probably not!
+         destStream.WriteString(UnicodeString(buf));
+{$ELSE}
          destStream.WriteString(UTF8ToString(buf));
+{$ENDIF}
       finally
          rs.Free;
       end;
@@ -3699,7 +3708,7 @@ var
    comma : Boolean;
    locData : IDataContext;
    v : Variant;
-   buf : String;
+   buf : UnicodeString;
 begin
    typ:=typ.UnAliasedType;
 
@@ -4196,11 +4205,11 @@ begin
    try
       json.BeginObject;
 
-      json.WriteName('version');
+      json.WriteName(UnicodeString('version'));
       json.WriteInteger(3);
-      json.WriteName('file');
+      json.WriteName(UnicodeString('file'));
       json.WriteString(outFileName);
-      json.WriteName('sourceRoot');
+      json.WriteName(UnicodeString('sourceRoot'));
       json.WriteString(srcRoot);
 
       // prepare map array
@@ -4262,11 +4271,11 @@ begin
       sources.Add(outFileName);
 
       // write names and mappings
-      json.WriteName('sources');
+      json.WriteName(UnicodeString('sources'));
       json.WriteStrings(sources);
-      json.WriteName('names');
+      json.WriteName(UnicodeString('names'));
       json.WriteStrings(names);
-      json.WriteName('mappings');
+      json.WriteName(UnicodeString('mappings'));
       json.WriteString(mappings.ToString);
 
       json.EndObject;
@@ -8870,7 +8879,7 @@ end;
 procedure TJSDeclaredExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
    e : TDeclaredExpr;
-   name : String;
+   name : UnicodeString;
    sym : TSymbol;
 begin
    e:=TDeclaredExpr(expr);

@@ -473,7 +473,7 @@ type
       Value : TSymbolTable;
    end;
 
-   TSimpleHashFunc<T> = function (const item : T) : TSimpleHashAction of object;
+   TSimpleHashSymbolTableFunc = function (const item : TSymbolTable) : TSimpleHashAction of object;
 
    TSimpleSymbolTableHash = class
       private
@@ -494,7 +494,7 @@ type
          function Remove(const anItem : TSymbolTable) : Boolean; // true if removed
          function Contains(const anItem : TSymbolTable) : Boolean;
          function Match(var anItem : TSymbolTable) : Boolean;
-         procedure Enumerate(callBack : TSimpleHashFunc<TSymbolTable>);
+         procedure Enumerate(callBack : TSimpleHashSymbolTableFunc);
          procedure Clear;
          procedure Clean;
 
@@ -2107,7 +2107,6 @@ type
 const
    cFuncKindToString : array [Low(TFuncKind)..High(TFuncKind)] of UnicodeString = (
       'function', 'procedure', 'constructor', 'destructor', 'method', 'lambda' );
-   cFirstFieldUnprepared : TFieldSymbol = Pointer(-1);
    cDefaultRandSeed : UInt64 = 88172645463325252;
 
 // ------------------------------------------------------------------
@@ -2538,7 +2537,7 @@ begin
    inherited Create(name, nil);
    FUnitSymbol:=aUnit;
    FMembers:=CreateMembersTable;
-   FFirstField:=cFirstFieldUnprepared;
+   FFirstField:=Pointer(-1);
 end;
 
 // Destroy
@@ -2593,7 +2592,7 @@ end;
 //
 procedure TCompositeTypeSymbol.AddField(fieldSym : TFieldSymbol);
 begin
-   Assert(FFirstField=cFirstFieldUnprepared);
+   Assert(FFirstField=Pointer(-1));
    FMembers.AddSymbol(fieldSym);
    fieldSym.FStructSymbol:=Self;
 end;
@@ -2773,7 +2772,7 @@ end;
 //
 function TCompositeTypeSymbol.FirstField : TFieldSymbol;
 begin
-   if FFirstField=cFirstFieldUnprepared then
+   if FFirstField=Pointer(-1) then
       PrepareFirstField;
    Result:=FFirstField;
 end;
@@ -5167,7 +5166,11 @@ end;
 //
 procedure TNilSymbol.InitData(const data : TData; offset : Integer);
 begin
+{$IFDEF FPC}
+   VarCopySafe(data[offset], Variant(nil));
+{$ELSE}
    VarCopySafe(data[offset], nil);
+{$ENDIF}
 end;
 
 // ------------------
@@ -6493,7 +6496,7 @@ end;
 
 // Enumerate
 //
-procedure TSimpleSymbolTableHash.Enumerate(callBack : TSimpleHashFunc<TSymbolTable>);
+procedure TSimpleSymbolTableHash.Enumerate(callBack : TSimpleHashSymbolTableFunc);
 var
    i : Integer;
 begin

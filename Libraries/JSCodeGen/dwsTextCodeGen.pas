@@ -141,13 +141,13 @@ begin
       for i:=0 to Count-1 do begin
          info:=@Infos[i];
          json.BeginObject;
-         json.WriteName('OutputLine');
+         json.WriteName(UnicodeString('OutputLine'));
          json.WriteInteger(info.OutputLine);
-         json.WriteName('SrcFile');
+         json.WriteName(UnicodeString('SrcFile'));
          json.WriteString(info.ScriptPos.SourceFile.Name);
-         json.WriteName('SrcLine');
+         json.WriteName(UnicodeString('SrcLine'));
          json.WriteInteger(info.ScriptPos.Line);
-         json.WriteName('SrcColumn');
+         json.WriteName(UnicodeString('SrcColumn'));
          json.WriteInteger(info.ScriptPos.Col);
          json.EndObject;
       end;

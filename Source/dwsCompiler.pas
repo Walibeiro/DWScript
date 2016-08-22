@@ -66,7 +66,7 @@ type
    TdwsOnNeedUnitEvent = function (const unitName : UnicodeString; var unitSource : UnicodeString) : IdwsUnit of object;
    TdwsResourceEvent = procedure (compiler : TdwsCompiler; const resourceName : UnicodeString) of object;
    TdwsCodeGenEvent = procedure (compiler : TdwsCompiler; const switchPos : TScriptPos; const code : UnicodeString) of object;
-   TdwsFilterEvent = procedure (compiler : TdwsCompiler; const sourceName : String; var sourceCode : String; var filter : TdwsFilter) of object;
+   TdwsFilterEvent = procedure (compiler : TdwsCompiler; const sourceName : String; var sourceCode : UnicodeString; var filter : TdwsFilter) of object;
 
    TCompilerCreateBaseVariantSymbolEvent = function (table : TSystemSymbolTable) : TBaseVariantSymbol of object;
    TCompilerCreateSystemSymbolsEvent = procedure (table : TSystemSymbolTable) of object;
