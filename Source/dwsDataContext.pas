@@ -328,7 +328,7 @@ begin
          {$IFDEF FPC}
          // TODO: check if the below is c
          if p.VString <> nil then begin
-            buf := SimpleStringHash(String(p.VString));
+            buf := SimpleStringHash(UnicodeString(p.VString));
             k := @buf;
          end;
          {$ELSE}

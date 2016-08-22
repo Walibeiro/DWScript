@@ -80,7 +80,7 @@ type
 
          procedure WriteJSON(const json : String);
 
-         function ToString : String; override;
+         function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF}; override;
          function ToUTF8String : RawByteString; inline;
 
          property Stream : TWriteOnlyBlockStream read FStream write FStream;
@@ -291,7 +291,7 @@ type
          procedure Clear;
          procedure Enumerate(const callback : TSimpleCallbackJSONValue);
          procedure WriteTo(writer : TdwsJSONWriter);
-         function ToString : String; override;
+         function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF}; override;
          property Items[const position : Integer] : TdwsJSONValue read GetItems write SetItems; default;
          property Count : Integer read FCount;
    end;
@@ -2937,7 +2937,7 @@ end;
 
 // ToString
 //
-function TdwsJSONWriter.ToString : String;
+function TdwsJSONWriter.ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF};
 begin
    Result:=FStream.ToString;
 end;
@@ -3153,7 +3153,7 @@ end;
 
 // ToString
 //
-function TdwsJSONValueList.ToString : String;
+function TdwsJSONValueList.ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF};
 var
    wr : TdwsJSONWriter;
    wobs : TWriteOnlyBlockStream;

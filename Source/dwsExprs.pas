@@ -457,7 +457,7 @@ type
          procedure AddString(const i : Int64); override;
          procedure AddCRLF; override;
          procedure Clear; override;
-         function ToString : String; override;
+         function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF}; override;
          function ToDataString : RawByteString; override;
 
          property Text : UnicodeString read GetText;
@@ -1999,7 +1999,7 @@ type
          destructor Destroy; override;
          procedure BeforeDestruction; override;
 
-         function ToString : String; override;
+         function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF}; override;
 
          procedure ClearData; override;
 
@@ -2041,7 +2041,7 @@ type
          function IndexOfInteger(const item : Int64; fromIndex : Integer) : Integer;
          function IndexOfFuncPtr(const item : Variant; fromIndex : Integer) : Integer;
 
-         function ToString : String; override;
+         function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF}; override;
          function ToStringArray : TStringDynArray;
          function ToInt64Array : TInt64DynArray;
 
@@ -2117,7 +2117,7 @@ type
                             executionContext : TdwsProgramExecution = nil);
          procedure BeforeDestruction; override;
 
-         function ToString : String; override;
+         function ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF}; override;
 
          property Typ : TInterfaceSymbol read FTyp;
          property Instance : IScriptObj read FInstance;
@@ -3932,7 +3932,7 @@ end;
 
 // ToString
 //
-function TdwsDefaultResult.ToString : String;
+function TdwsDefaultResult.ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF};
 begin
    Result:=GetText;
 end;
@@ -7249,7 +7249,7 @@ end;
 
 // ToString
 //
-function TScriptObjInstance.ToString : String;
+function TScriptObjInstance.ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF};
 begin
    Result:=FClassSym.Name;
 end;
@@ -7554,7 +7554,7 @@ end;
 
 // ToString
 //
-function TScriptDynamicArray.ToString : String;
+function TScriptDynamicArray.ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF};
 begin
    Result:='array of '+FElementTyp.Name;
 end;
@@ -7896,7 +7896,7 @@ end;
 
 // ToString
 //
-function TScriptInterface.ToString : String;
+function TScriptInterface.ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF};
 begin
    Result:=FTyp.ClassName;
 end;

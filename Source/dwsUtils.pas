@@ -1025,7 +1025,7 @@ type
          FLength : Integer;
 
       public
-         constructor Create(const s : String);
+         constructor Create(const s : UnicodeString);
 
          function Current : Char; inline;
          function EOF : Boolean; inline;
@@ -1145,10 +1145,10 @@ procedure ScriptStringToRawByteString(const s : UnicodeString; var result : RawB
 procedure StringBytesToWords(var buf : UnicodeString; swap : Boolean);
 procedure StringWordsToBytes(var buf : UnicodeString; swap : Boolean);
 
-function BinToHex(const data; n : Integer) : String; overload;
-function BinToHex(const data : RawByteString) : String; overload; inline;
+function BinToHex(const data; n : Integer) : UnicodeString; overload;
+function BinToHex(const data : RawByteString) : UnicodeString; overload; inline;
 
-function HexToBin(const data : String) : RawByteString;
+function HexToBin(const data : UnicodeString) : RawByteString;
 
 type
    TInt64StringBuffer = array [0..21] of WideChar;
@@ -1188,7 +1188,7 @@ type
    EISO8601Exception = class (Exception);
 
 function TryISO8601ToDateTime(const v : String; var aResult : TDateTime) : Boolean;
-function ISO8601ToDateTime(const v : String) : TDateTime;
+function ISO8601ToDateTime(const v : UnicodeString) : TDateTime;
 function DateTimeToISO8601(dt : TDateTime; extendedFormat : Boolean) : String;
 
 procedure SuppressH2077ValueAssignedToVariableNeverUsed(const X); inline;
@@ -1407,7 +1407,7 @@ end;
 
 // BinToHex
 //
-function BinToHex(const data; n : Integer) : String;
+function BinToHex(const data; n : Integer) : UnicodeString;
 const
    cHexDigits : array [0..15] of Char = (
       '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -1433,14 +1433,14 @@ end;
 
 // BinToHex
 //
-function BinToHex(const data : RawByteString) : String; overload;
+function BinToHex(const data : RawByteString) : UnicodeString; overload;
 begin
    Result:=BinToHex(Pointer(data)^, Length(data));
 end;
 
 // HexToBin
 //
-function HexToBin(const data : String) : RawByteString;
+function HexToBin(const data : UnicodeString) : RawByteString;
 var
    i, n, b : Integer;
    c : Char;
@@ -2047,7 +2047,7 @@ begin
          TVarData(dest).VType:=varUString;
          {$IFDEF FPC}
          // TODO: Check if the code below is correct
-         UnicodeString(TVarData(dest).VString):=String(TVarData(src).VString);
+         UnicodeString(TVarData(dest).VString):=UnicodeString(TVarData(src).VString);
          {$ELSE}
          UnicodeString(TVarData(dest).VUString):=String(TVarData(src).VUString);
          {$ENDIF}
@@ -2293,7 +2293,7 @@ end;
 
 // ISO8601ToDateTime
 //
-function ISO8601ToDateTime(const v : String) : TDateTime;
+function ISO8601ToDateTime(const v : UnicodeString) : TDateTime;
 var
    p : PChar;
 
@@ -2588,7 +2588,7 @@ var
 // CompareStrings
 //
 {$ifdef FPC}
-function TFastCompareStringList.DoCompareText(const S1, S2: String): PtrInt;
+function TFastCompareStringList.DoCompareText(const S1, S2: AnsiString): PtrInt;
 begin
    Result:=CompareStr(S1, S2);
 end;
@@ -3098,7 +3098,7 @@ end;
 // CompareStrings
 //
 {$ifdef FPC}
-function TFastCompareTextList.DoCompareText(const S1, S2: String): PtrInt;
+function TFastCompareTextList.DoCompareText(const S1, S2: AnsiString): PtrInt;
 begin
    Result:=UnicodeCompareText(s1, s2);
 end;
@@ -4426,8 +4426,8 @@ end;
 
 // ToString
 //
-function TWriteOnlyBlockStream.ToString : String;
 {$ifdef FPC}
+function TWriteOnlyBlockStream.ToString : AnsiString;
 var
    uniBuf : UnicodeString;
 begin
@@ -4440,6 +4440,7 @@ begin
 
    end else Result:='';
 {$else}
+function TWriteOnlyBlockStream.ToString : String;
 begin
    if FTotalSize>0 then begin
 
@@ -6355,7 +6356,7 @@ end;
 
 // ToString
 //
-function TAutoWriteOnlyBlockStream.ToString : String;
+function TAutoWriteOnlyBlockStream.ToString : {$IFDEF FPC} AnsiString {$ELSE} String{$ENDIF};
 begin
    Result:=FStream.ToString;
 end;
@@ -6366,7 +6367,7 @@ end;
 
 // Create
 //
-constructor TStringIterator.Create(const s : String);
+constructor TStringIterator.Create(const s : UnicodeString);
 begin
    FStr:=s;
    FPStr:=PChar(Pointer(s));

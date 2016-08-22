@@ -1630,7 +1630,7 @@ end;
 procedure TdwsCodeGen.WriteBlockEnd;
 begin
    UnIndent;
-   WriteString('}');
+   WriteString(UnicodeString('}'));
 end;
 
 // WriteBlockEndLn
@@ -2280,9 +2280,9 @@ end;
 procedure TdwsExprCodeGen.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 begin
    if expr is TTypedExpr then begin
-      codeGen.WriteString('(');
+      codeGen.WriteString(UnicodeString('('));
       CodeGenNoWrap(codeGen, TTypedExpr(expr));
-      codeGen.WriteString(')');
+      codeGen.WriteString(UnicodeString(')'));
    end;
 end;
 

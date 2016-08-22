@@ -31,7 +31,7 @@ type
          class procedure ParseURLEncoded(const data : RawByteString; dest : TStrings); static;
          class function DecodeURLEncoded(const src : RawByteString; start, count : Integer) : String; overload; static;
          class function DecodeURLEncoded(const src : RawByteString; start : Integer) : String; overload; static;
-         class function EncodeURLEncoded(const src : String) : String; static;
+         class function EncodeURLEncoded(const src : UnicodeString) : UnicodeString; static;
 
          class function DecodeHex2(p : PAnsiChar) : Integer; static;
          class function HasFieldName(const list : TStrings; const name : String) : Boolean; static;
@@ -41,12 +41,12 @@ type
          class function DateTimeToRFC822(const dt : TDateTime) : String; static;
          class function RFC822ToDateTime(const str : String) : TDateTime; static;
 
-         class function HTMLTextEncode(const s : String) : String; static;
-         class function HTMLTextDecode(const s : String) : String; static;
+         class function HTMLTextEncode(const s : UnicodeString) : UnicodeString; static;
+         class function HTMLTextDecode(const s : UnicodeString) : UnicodeString; static;
          class function HTMLCharacterDecode(p : PChar) : Char; static;
 
-         class function HTMLAttributeEncode(const s : String) : String; static;
-         class function HTMLAttributeDecode(const s : String) : String; static;
+         class function HTMLAttributeEncode(const s : UnicodeString) : UnicodeString; static;
+         class function HTMLAttributeDecode(const s : UnicodeString) : UnicodeString; static;
    end;
 
 
@@ -62,7 +62,7 @@ const
    cToHex : String = '0123456789ABCDEF';
 
    // based on http://www.w3.org/TR/html5/entities.json
-   cAllNamedEntities =
+   cAllNamedEntities : AnsiString =
        'Aacute=C1,aacute=E1,Abreve=102,abreve=103,ac=223E,acd=223F,acE=223E,Acirc=C2,acirc=E2,acute=B4,Acy=410,acy=430,AElig=C6,aelig=E6,'
       +'af=2061,Afr=1D504,afr=1D51E,Agrave=C0,agrave=E0,alefsym=2135,aleph=2135,Alpha=391,alpha=3B1,Amacr=100,amacr=101,amalg=2A3F,'
       +'AMP=26,amp=26,And=2A53,and=2227,andand=2A55,andd=2A5C,andslope=2A58,andv=2A5A,ang=2220,ange=29A4,angle=2220,angmsd=2221,angmsdaa=29A8,'
@@ -283,7 +283,7 @@ function AllNamedEntities : IAutoStrings;
       i : Integer;
    begin
       list:=TFastCompareStringList.Create;
-      list.CommaText:=cAllNamedEntities;
+      list.CommaText:=string(cAllNamedEntities);
       for i:=0 to list.Count-1 do begin
          list.Objects[i]:=TObject(StrToInt('$'+list.ValueFromIndex[i]));
          list[i]:=list.Names[i];
@@ -376,7 +376,7 @@ end;
 
 // EncodeURLEncoded
 //
-class function WebUtils.EncodeURLEncoded(const src : String) : String;
+class function WebUtils.EncodeURLEncoded(const src : UnicodeString) : UnicodeString;
 var
    raw : UTF8String;
    pSrc : PAnsiChar;
@@ -542,7 +542,7 @@ const
 type
    TStringArray = array of String;
 var
-   list : array [0..cMaxItems+1] of String;
+   list : array [0..cMaxItems+1] of UnicodeString;
    count : Integer;
    y, mo, d : Word;
    h, mi, s : Word;
@@ -583,7 +583,7 @@ var
       Result:=ParseTwoDigits(p, 0)*100+ParseTwoDigits(p, 2);
    end;
 
-   procedure ParseHMS(const str : String);
+   procedure ParseHMS(const str : UnicodeString);
    var
       p : PChar;
    begin
@@ -606,7 +606,7 @@ var
       end;
    end;
 
-   procedure ParseYear(const str : String);
+   procedure ParseYear(const str : UnicodeString);
    begin
       case Length(str) of
          2 : y:=ParseTwoDigits(Pointer(str), 0)+2000;
@@ -667,7 +667,7 @@ end;
 
 // HTMLTextEncode
 //
-class function WebUtils.HTMLTextEncode(const s : String) : String;
+class function WebUtils.HTMLTextEncode(const s : UnicodeString) : UnicodeString;
 var
    capacity : Integer;
    pSrc, pDest : PChar;
@@ -685,7 +685,7 @@ var
       pDest := Pointer(NativeUInt(Pointer(Result))+k);
    end;
 
-   procedure Append(const a : String);
+   procedure Append(const a : UnicodeString);
    var
       n : Integer;
    begin
@@ -726,7 +726,7 @@ end;
 
 // HTMLTextDecode
 //
-class function WebUtils.HTMLTextDecode(const s : String) : String;
+class function WebUtils.HTMLTextDecode(const s : UnicodeString) : UnicodeString;
 type
    TDecoderState = ( dsText, dsTag, dsSingleQuote, dsDoubleQuote, dsCharacter );
 var
@@ -883,7 +883,7 @@ end;
 
 // HTMLAttributeEncode
 //
-class function WebUtils.HTMLAttributeEncode(const s : String) : String;
+class function WebUtils.HTMLAttributeEncode(const s : UnicodeString) : UnicodeString;
 // as per OWASP XSS Rule#2
 var
    capacity : Integer;
@@ -950,7 +950,7 @@ end;
 
 // HTMLAttributeDecode
 //
-class function WebUtils.HTMLAttributeDecode(const s : String) : String;
+class function WebUtils.HTMLAttributeDecode(const s : UnicodeString) : UnicodeString;
 begin
    Result:=WebUtils.HTMLTextDecode(s);
 end;

@@ -222,7 +222,7 @@ procedure TdwsExprGenericCodeGen.DoCodeGen(codeGen : TdwsCodeGen; expr : TExprBa
 
 var
    i, idx : Integer;
-   c : Char;
+   c : WideChar;
    item : TExprBase;
    noWrap : Boolean;
 begin
