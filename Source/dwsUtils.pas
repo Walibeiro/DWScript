@@ -2736,8 +2736,8 @@ begin
    ps2:=PWideChar(NativeInt(s2));
    if ps1<>nil then begin
       if ps2<>nil then begin
-         n1:=PInteger(NativeUInt(ps1)-4)^;
-         n2:=PInteger(NativeUInt(ps2)-4)^;
+         n1:=PInteger(NativeUInt(ps1)-{$IFDEF FPC}8{$ELSE}4{$ENDIF})^;
+         n2:=PInteger(NativeUInt(ps2)-{$IFDEF FPC}8{$ELSE}4{$ENDIF})^;
          if n1<n2 then begin
             Result:=UnicodeCompareLen(ps1, ps2, n1);
             if Result=0 then
