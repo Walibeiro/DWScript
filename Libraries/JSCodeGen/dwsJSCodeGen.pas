@@ -52,7 +52,7 @@ type
 
    TdwsCodeGenSymbolMapJSObfuscating = class (TdwsCodeGenSymbolMap)
       protected
-         function DoNeedUniqueName(symbol : TSymbol; tryCount : Integer; canObfuscate : Boolean) : String; override;
+         function DoNeedUniqueName(symbol : TSymbol; tryCount : Integer; canObfuscate : Boolean) : UnicodeString; override;
    end;
 
    TSimpleHashSymbolBucket = record
@@ -207,7 +207,7 @@ type
 
          procedure Clear; override;
 
-         function  SymbolMappedName(sym : TSymbol; scope : TdwsCodeGenSymbolScope) : String; override;
+         function  SymbolMappedName(sym : TSymbol; scope : TdwsCodeGenSymbolScope) : UnicodeString; override;
 
          procedure CompileValue(expr : TTypedExpr); override;
 
@@ -222,14 +222,14 @@ type
          procedure CompileDependencies(destStream : TWriteOnlyBlockStream; const prog : IdwsProgram); override;
          procedure CompileResourceStrings(destStream : TWriteOnlyBlockStream; const prog : IdwsProgram); override;
 
-         function GetNewTempSymbol : String; override;
+         function GetNewTempSymbol : UnicodeString; override;
 
          procedure WriteSymbolVerbosity(sym : TSymbol); override;
 
-         procedure WriteLiteralString(const s : String); override;
+         procedure WriteLiteralString(const s : UnicodeString); override;
          procedure WriteFloat(const v : Double; const fmt : TFormatSettings); override;
 
-         function MemberName(sym : TSymbol; cls : TCompositeTypeSymbol) : String;
+         function MemberName(sym : TSymbol; cls : TCompositeTypeSymbol) : UnicodeString;
 
          procedure WriteCompiledOutput(dest : TWriteOnlyBlockStream; const prog : IdwsProgram); override;
 
@@ -382,7 +382,7 @@ type
          constructor Create(codeGen : TdwsJSCodeGen; const customExec : IdwsProgramExecution);
          destructor Destroy; override;
 
-         procedure RegisterIntercept(const exprClassName, qualifiedName : String;
+         procedure RegisterIntercept(const exprClassName, qualifiedName : UnicodeString;
                                      const callBack : IInfo);
 
          property CodeGen : TdwsJSCodeGen read FCodeGen;
@@ -539,7 +539,7 @@ type
    end;
 
    TJSSetOfExpr = class (TJSExprCodeGen)
-      class procedure CodeGenFunc(codeGen : TdwsCodeGen; const funcName : String;
+      class procedure CodeGenFunc(codeGen : TdwsCodeGen; const funcName : UnicodeString;
                                   base, operand : TExprBase; setType : TSetOfSymbol);
    end;
    TJSSetOfFunctionExpr = class (TJSSetOfExpr)
@@ -624,7 +624,7 @@ type
    TJSStringArrayOpExpr = class (TJSExprCodeGen)
       procedure CodeGen(codeGen : TdwsCodeGen; expr : TExprBase); override;
       class procedure CodeGenCharXxxAt(codeGen : TdwsCodeGen; expr : TExprBase;
-                                       const xxx : String); static;
+                                       const xxx : UnicodeString); static;
    end;
    TJSVarStringArraySetExpr = class (TJSExprCodeGen)
       protected
@@ -777,7 +777,7 @@ type
          procedure CodeGenFunctionName(codeGen : TdwsCodeGen; expr : TFuncExprBase; funcSym : TFuncSymbol); virtual;
          procedure CodeGenBeginParams(codeGen : TdwsCodeGen; expr : TFuncExprBase); virtual;
 
-         class function GetSignature(funcSym : TFuncSymbol) : String;
+         class function GetSignature(funcSym : TFuncSymbol) : UnicodeString;
    end;
 
    TJSRecordMethodExpr = class (TJSFuncBaseExpr)
@@ -982,12 +982,12 @@ uses
   dwsExprList, dwsJSRTL;
 
 const
-   cBoolToJSBool : array [False..True] of String = ('false', 'true');
+   cBoolToJSBool : array [False..True] of UnicodeString = ('false', 'true');
    cFormatSettings : TFormatSettings = ( DecimalSeparator : '.' );
    cInlineStaticArrayLimit = 20;
 
 const
-   cJSReservedWords : array [1..203] of String = (
+   cJSReservedWords : array [1..203] of UnicodeString = (
       // Main JS keywords
       // from https://developer.mozilla.org/en/JavaScript/Reference/Reserved_Words
       'break', 'case', 'catch', 'continue', 'debugger', 'default', 'delete',
@@ -2003,7 +2003,7 @@ end;
 
 // SymbolMappedName
 //
-function TdwsJSCodeGen.SymbolMappedName(sym : TSymbol; scope : TdwsCodeGenSymbolScope) : String;
+function TdwsJSCodeGen.SymbolMappedName(sym : TSymbol; scope : TdwsCodeGenSymbolScope) : UnicodeString;
 var
    ct : TClass;
 begin
@@ -2611,7 +2611,7 @@ var
    fieldTyp : TTypeSymbol;
    prop : TPropertySymbol;
    firstField : Boolean;
-   publishedName : String;
+   publishedName : UnicodeString;
    locData : IDataContext;
    activeFields : array of TFieldSymbol;
 begin
@@ -3154,7 +3154,7 @@ procedure TdwsJSCodeGen.CompileDependencies(destStream : TWriteOnlyBlockStream; 
 var
    processedDependencies : TStringList;
 
-   procedure InsertResourceDependency(const depName : String);
+   procedure InsertResourceDependency(const depName : UnicodeString);
    var
       rs : TResourceStream;
       buf : UTF8String;
@@ -3178,7 +3178,7 @@ var
       FlushedDependencies.Add(depName);
    end;
 
-   procedure InsertDependencyRef(const ref : String);
+   procedure InsertDependencyRef(const ref : UnicodeString);
    begin
       if processedDependencies.IndexOf(ref)<0 then begin
          processedDependencies.Add(ref);
@@ -3291,7 +3291,7 @@ end;
 
 // GetNewTempSymbol
 //
-function TdwsJSCodeGen.GetNewTempSymbol : String;
+function TdwsJSCodeGen.GetNewTempSymbol : UnicodeString;
 
    function IntToBase62(i : Integer) : String;
    var
@@ -3377,7 +3377,7 @@ end;
 
 // WriteLiteralString
 //
-procedure TdwsJSCodeGen.WriteLiteralString(const s : String);
+procedure TdwsJSCodeGen.WriteLiteralString(const s : UnicodeString);
 begin
    WriteIndentIfNeeded;
    dwsJSON.WriteJavaScriptString(Output, s);
@@ -4114,7 +4114,7 @@ end;
 
 // MemberName
 //
-function TdwsJSCodeGen.MemberName(sym : TSymbol; cls : TCompositeTypeSymbol) : String;
+function TdwsJSCodeGen.MemberName(sym : TSymbol; cls : TCompositeTypeSymbol) : UnicodeString;
 //var
 //   n : Integer;
 //   match : TSymbol;
@@ -4776,7 +4776,7 @@ procedure TJSRAWBlockExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
    e : TdwsJSBlockExpr;
    i : Integer;
-   jsCode, symCode, prefCode : String;
+   jsCode, symCode, prefCode : UnicodeString;
    sym, prefix : TSymbol;
 begin
    e:=TdwsJSBlockExpr(expr);
@@ -5351,7 +5351,7 @@ var
    funcSym : TFuncSymbol;
    paramExpr : TTypedExpr;
    paramSymbol : TParamSymbol;
-   name : String;
+   name : UnicodeString;
 begin
    // TODO: handle deep copy of records, lazy params
    e:=TFuncExprBase(expr);
@@ -5434,7 +5434,7 @@ end;
 
 // GetSignature
 //
-class function TJSFuncBaseExpr.GetSignature(funcSym : TFuncSymbol) : String;
+class function TJSFuncBaseExpr.GetSignature(funcSym : TFuncSymbol) : UnicodeString;
 var
    i : Integer;
 begin
@@ -7295,7 +7295,7 @@ var
    sym : TSymbol;
    fieldSym : TFieldSymbol;
    locData : IDataContext;
-   externalName : String;
+   externalName : UnicodeString;
 begin
    codeGen.WriteBlockBegin('');
 
@@ -8262,7 +8262,7 @@ end;
 // CodeGenCharXxxAt
 //
 class procedure TJSStringArrayOpExpr.CodeGenCharXxxAt(
-   codeGen : TdwsCodeGen; expr : TExprBase; const xxx : String);
+   codeGen : TdwsCodeGen; expr : TExprBase; const xxx : UnicodeString);
 var
    e : TStringArrayOpExpr;
    noRangeCheck : Boolean;
@@ -8459,7 +8459,7 @@ end;
 //
 procedure TJSForExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
-   tmpTo, tmpStep : String;
+   tmpTo, tmpStep : UnicodeString;
    e : TForExpr;
    nonIncludedEnd : Boolean;
 begin
@@ -8619,7 +8619,7 @@ end;
 //
 procedure TJSForCharCodeInStrExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
-   tmpLoop, tmpIn : String;
+   tmpLoop, tmpIn : UnicodeString;
    e : TForCharCodeInStrExpr;
 begin
    e:=TForCharCodeInStrExpr(expr);
@@ -8681,7 +8681,7 @@ end;
 //
 procedure TJSForCharInStrExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
-   tmpLoop, tmpIn : String;
+   tmpLoop, tmpIn : UnicodeString;
    e : TForCharInStrExpr;
 begin
    e:=TForCharInStrExpr(expr);
@@ -8953,7 +8953,7 @@ var
    e : TSwapExpr;
    argTyp : TTypeSymbol;
    ct : TClass;
-   tmp : String;
+   tmp : UnicodeString;
 begin
    e:=TSwapExpr(expr);
 
@@ -9029,7 +9029,7 @@ end;
 
 // DoNeedUniqueName
 //
-function TdwsCodeGenSymbolMapJSObfuscating.DoNeedUniqueName(symbol : TSymbol; tryCount : Integer; canObfuscate : Boolean) : String;
+function TdwsCodeGenSymbolMapJSObfuscating.DoNeedUniqueName(symbol : TSymbol; tryCount : Integer; canObfuscate : Boolean) : UnicodeString;
 var
    h : Integer;
 begin
@@ -9101,7 +9101,7 @@ end;
 
 // CodeGenFunc
 //
-class procedure TJSSetOfExpr.CodeGenFunc(codeGen : TdwsCodeGen; const funcName : String;
+class procedure TJSSetOfExpr.CodeGenFunc(codeGen : TdwsCodeGen; const funcName : UnicodeString;
                                            base, operand : TExprBase; setType : TSetOfSymbol);
 begin
    codeGen.Dependencies.Add(funcName);
@@ -9270,7 +9270,7 @@ end;
 
 // RegisterIntercept
 //
-procedure TdwsJSCodeGenEnvironment.RegisterIntercept(const exprClassName, qualifiedName : String;
+procedure TdwsJSCodeGenEnvironment.RegisterIntercept(const exprClassName, qualifiedName : UnicodeString;
                                                      const callBack : IInfo);
 var
    intercept : TdwsJSCodeGenIntercept;
@@ -9338,7 +9338,7 @@ procedure TdwsJSCodeGenIntercept.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase
 var
    i : Integer;
    info : IInfo;
-   s : String;
+   s : UnicodeString;
    dynArray : TScriptDynamicArray;
    exec : TdwsExecution;
 begin

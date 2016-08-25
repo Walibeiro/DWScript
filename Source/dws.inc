@@ -60,7 +60,7 @@
 {$ELSE}
    {$mode delphi}
    {$DEFINE PUREPASCAL}
-   {$H+}
+   {$H-}
 {$ENDIF}
 
 {.$DEFINE PUREPASCAL}

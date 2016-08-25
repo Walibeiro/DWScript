@@ -41,7 +41,7 @@ type
          procedure ReadFromFiler(reader: TReader; var Name : UnicodeString);
    end;
 
-   TNamesEnumerationCallback = procedure (const name : String) of object;
+   TNamesEnumerationCallback = procedure (const name : UnicodeString) of object;
 
    TGlobalVarsGarbageCollector = class;
 
@@ -80,7 +80,7 @@ type
          function  Delete(const aName : UnicodeString) : Boolean;
          procedure Cleanup(const filter : String = '*');
 
-         procedure EnumerateNames(const filter : String; callback : TNamesEnumerationCallback);
+         procedure EnumerateNames(const filter : UnicodeString; callback : TNamesEnumerationCallback);
          function  NamesCommaText : String;
 
          procedure SaveToFiler(writer : TWriter);
@@ -467,7 +467,7 @@ end;
 
 // EnumerateNames
 //
-procedure TGlobalVars.EnumerateNames(const filter : String; callback : TNamesEnumerationCallback);
+procedure TGlobalVars.EnumerateNames(const filter : UnicodeString; callback : TNamesEnumerationCallback);
 var
    i : Integer;
    mask : TMask;
@@ -487,9 +487,9 @@ end;
 //
 type
    TStringsAdder = class(TStrings)
-      procedure Add(const name : String); reintroduce;
+      procedure Add(const name : UnicodeString); reintroduce;
    end;
-procedure TStringsAdder.Add(const name : String);
+procedure TStringsAdder.Add(const name : UnicodeString);
 begin
    inherited Add(name);
 end;

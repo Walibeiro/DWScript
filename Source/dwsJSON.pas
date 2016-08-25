@@ -213,7 +213,7 @@ type
       public
          destructor Destroy; override;
 
-         class function ParseString(const json : UnicodeString;
+         class function ParseString(const json : string;
                                     duplicatesOption : TdwsJSONDuplicatesOptions = jdoOverwrite) : TdwsJSONValue; static;
          class function ParseFile(const fileName : UnicodeString) : TdwsJSONValue; static;
 
@@ -224,8 +224,8 @@ type
          procedure WriteToStream(aStream : TStream); overload;
          procedure WriteToStream(aStream : TWriteOnlyBlockStream); overload;
 
-         function  ToString : UnicodeString; reintroduce;
-         function  ToBeautifiedString(initialTabs : Integer = 0; indentTabs : Integer = 1) : UnicodeString;
+         function  ToString : String; reintroduce;
+         function  ToBeautifiedString(initialTabs : Integer = 0; indentTabs : Integer = 1) : String;
 
          procedure Detach;
 
@@ -1105,7 +1105,7 @@ end;
 
 // ParseString
 //
-class function TdwsJSONValue.ParseString(const json : UnicodeString;
+class function TdwsJSONValue.ParseString(const json : string;
                                          duplicatesOption : TdwsJSONDuplicatesOptions = jdoOverwrite) : TdwsJSONValue;
 const
    cAutoUnifierTreshold = 10 * 1024 * 1024;
@@ -1195,7 +1195,7 @@ end;
 
 // ToString
 //
-function TdwsJSONValue.ToString : UnicodeString;
+function TdwsJSONValue.ToString : String;
 var
    writer : TdwsJSONWriter;
 begin
@@ -1211,7 +1211,7 @@ end;
 
 // ToBeautifiedString
 //
-function TdwsJSONValue.ToBeautifiedString(initialTabs, indentTabs : Integer) : UnicodeString;
+function TdwsJSONValue.ToBeautifiedString(initialTabs, indentTabs : Integer) : String;
 var
    writer : TdwsJSONBeautifiedWriter;
 begin

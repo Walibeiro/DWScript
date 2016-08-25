@@ -119,7 +119,7 @@ type
          FCodeGen : TdwsCodeGen;
 
       protected
-         function DoNeedUniqueName(symbol : TSymbol; tryCount : Integer; canObfuscate : Boolean) : String; virtual;
+         function DoNeedUniqueName(symbol : TSymbol; tryCount : Integer; canObfuscate : Boolean) : UnicodeString; virtual;
 
          procedure RaiseAlreadyDefined(sym, existing : TSymbol);
 
@@ -242,10 +242,10 @@ type
          constructor Create;
          destructor Destroy; override;
 
-         procedure Add(const dep : String);
+         procedure Add(const dep : UnicodeString);
          procedure Clear;
 
-         function Contains(const dep : String) : Boolean;
+         function Contains(const dep : UnicodeString) : Boolean;
 
          property List : TStringList read FList;
    end;
@@ -353,7 +353,7 @@ type
          function  FindCodeGen(expr : TExprBase) : TdwsExprCodeGen; overload;
          function  FindCodeGen(exprClass : TExprBaseClass) : TdwsExprCodeGen; overload;
          function  FindSymbolAtStackAddr(stackAddr, level : Integer) : TDataSymbol; deprecated;
-         function  SymbolMappedName(sym : TSymbol; scope : TdwsCodeGenSymbolScope) : String; virtual;
+         function  SymbolMappedName(sym : TSymbol; scope : TdwsCodeGenSymbolScope) : UnicodeString; virtual;
 
          procedure NotifyCompileExpr(expr : TExprBase); virtual;
 
@@ -394,15 +394,15 @@ type
          procedure Indent(needIndent : Boolean = True);
          procedure UnIndent(needIndent : Boolean = True);
 
-         procedure WriteString(const s : String); overload;
+         procedure WriteString(const s : UnicodeString); overload;
          procedure WriteString(const c : WideChar); overload;
-         procedure WriteStringLn(const s : String);
+         procedure WriteStringLn(const s : UnicodeString);
          procedure WriteLineEnd;
          procedure WriteStatementEnd; virtual;
          procedure WriteBlockBegin(const prefix : String); virtual;
          procedure WriteBlockEnd; virtual;
          procedure WriteBlockEndLn;
-         procedure WriteLiteralString(const s : String); virtual; abstract;
+         procedure WriteLiteralString(const s : UnicodeString); virtual; abstract;
          procedure WriteFloat(const v : Double; const fmt : TFormatSettings); virtual; abstract;
          procedure WriteInteger(v : Int64);
 
@@ -412,7 +412,7 @@ type
 
          function LocationString(e : TExprBase) : String;
          function IncTempSymbolCounter : Integer;
-         function GetNewTempSymbol : String; virtual;
+         function GetNewTempSymbol : UnicodeString; virtual;
 
          procedure EnterTry; inline;
          procedure LeaveTry; inline;
@@ -817,7 +817,7 @@ end;
 
 // SymbolMappedName
 //
-function TdwsCodeGen.SymbolMappedName(sym : TSymbol; scope : TdwsCodeGenSymbolScope) : String;
+function TdwsCodeGen.SymbolMappedName(sym : TSymbol; scope : TdwsCodeGenSymbolScope) : UnicodeString;
 var
 //   i : Integer;
    meth : TMethodSymbol;
@@ -1565,7 +1565,7 @@ end;
 
 // WriteString
 //
-procedure TdwsCodeGen.WriteString(const s : String);
+procedure TdwsCodeGen.WriteString(const s : UnicodeString);
 var
    i : Integer;
 begin
@@ -1594,7 +1594,7 @@ end;
 
 // WriteStringLn
 //
-procedure TdwsCodeGen.WriteStringLn(const s : String);
+procedure TdwsCodeGen.WriteStringLn(const s : UnicodeString);
 begin
    WriteString(s);
    WriteLineEnd;
@@ -1674,7 +1674,7 @@ end;
 
 // GetNewTempSymbol
 //
-function TdwsCodeGen.GetNewTempSymbol : String;
+function TdwsCodeGen.GetNewTempSymbol : UnicodeString;
 begin
    Inc(FTempSymbolCounter);
    Result:=IntToStr(FTempSymbolCounter);
@@ -2793,7 +2793,7 @@ end;
 
 // DoNeedUniqueName
 //
-function TdwsCodeGenSymbolMap.DoNeedUniqueName(symbol : TSymbol; tryCount : Integer; canObfuscate : Boolean) : String;
+function TdwsCodeGenSymbolMap.DoNeedUniqueName(symbol : TSymbol; tryCount : Integer; canObfuscate : Boolean) : UnicodeString;
 begin
    if FParent<>nil then
       Exit(Parent.DoNeedUniqueName(symbol, tryCount, canObfuscate));
@@ -2932,7 +2932,7 @@ end;
 
 // Add
 //
-procedure TdwsCodeGenDependencies.Add(const dep : String);
+procedure TdwsCodeGenDependencies.Add(const dep : UnicodeString);
 var
    p : Integer;
    s : String;
@@ -2957,7 +2957,7 @@ end;
 
 // Contains
 //
-function TdwsCodeGenDependencies.Contains(const dep : String) : Boolean;
+function TdwsCodeGenDependencies.Contains(const dep : UnicodeString) : Boolean;
 begin
    Result:=(List.IndexOf(dep)>=0);
 end;

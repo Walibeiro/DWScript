@@ -234,8 +234,9 @@ var
    firstSymbol : Boolean;
    ptsr : TPascalTokenizerStateRules;
 
-   function FlushCode(drop : Integer) : String;
+   function FlushCode(drop : Integer) : UnicodeString;
    begin
+      // TODO: Possible FPC issue
       SetString(Result, startPos, (NativeUInt(tok.PosPtr)-NativeUInt(startPos)) div SizeOf(Char)-NativeUInt(drop));
       startPos:=tok.PosPtr;
    end;

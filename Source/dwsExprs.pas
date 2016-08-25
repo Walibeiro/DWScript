@@ -2068,7 +2068,7 @@ type
 
    TScriptDynamicStringArray = class (TScriptDynamicValueArray)
       public
-         procedure Add(const s : String);
+         procedure Add(const s : UnicodeString);
    end;
 
    TScriptAssociativeArrayHashCodes = array of Cardinal;
@@ -7672,7 +7672,7 @@ end;
 
 // Add
 //
-procedure TScriptDynamicStringArray.Add(const s : String);
+procedure TScriptDynamicStringArray.Add(const s : UnicodeString);
 begin
    ArrayLength:=ArrayLength+1;
    if s<>'' then

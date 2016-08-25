@@ -25,7 +25,7 @@ uses
 
 type
    TJSRTLDependency = record
-      Name, Code, Dependency, Dependency2 : String;
+      Name, Code, Dependency, Dependency2 : UnicodeString;
    end;
    PJSRTLDependency = ^TJSRTLDependency;
 
@@ -34,7 +34,7 @@ type
          FMagicCodeGens : TStringList;
 
          class var vAliases : TStringList;
-         class procedure RegisterAlias(const aliasName, canonicalName : String); static;
+         class procedure RegisterAlias(const aliasName, canonicalName : UnicodeString); static;
 
       public
          constructor Create(const codeGen : TdwsCodeGen);
@@ -43,7 +43,7 @@ type
          procedure CodeGen(codeGen : TdwsCodeGen; expr : TExprBase); override;
          procedure CodeGenFunctionName(codeGen : TdwsCodeGen; expr : TFuncExprBase; funcSym : TFuncSymbol); override;
 
-         class function CanonicalName(const aName : String) : String; static;
+         class function CanonicalName(const aName : UnicodeString) : UnicodeString; static;
    end;
 
    TJSSqrMagicExpr = class (TJSFuncBaseExpr)
@@ -105,7 +105,7 @@ type
          Width : Integer;
          Precision : Integer;
          Typ : Char;
-         Str : String;
+         Str : UnicodeString;
    end;
 
    TFormatSplitInfos = class
@@ -121,7 +121,7 @@ type
          procedure SetItem(index : Integer; const item : TFormatSplitInfo);
 
       public
-         constructor Create(const fmtString : String);
+         constructor Create(const fmtString : UnicodeString);
          destructor Destroy; override;
          function Add(const anItem : TFormatSplitInfo) : Integer;
          function IndexOf(const anItem : TFormatSplitInfo) : Integer;
@@ -141,8 +141,8 @@ type
          procedure CodeGen(codeGen : TdwsCodeGen; expr : TExprBase); override;
    end;
 
-function FindJSRTLDependency(const name : String) : PJSRTLDependency;
-function All_RTL_JS : String;
+function FindJSRTLDependency(const name : UnicodeString) : PJSRTLDependency;
+function All_RTL_JS : UnicodeString;
 procedure IgnoreJSRTLDependencies(dependencies : TStrings);
 
 // ------------------------------------------------------------------
@@ -1192,7 +1192,7 @@ const
 
 // FindJSRTLDependency
 //
-function FindJSRTLDependency(const name : String) : PJSRTLDependency;
+function FindJSRTLDependency(const name : UnicodeString) : PJSRTLDependency;
 var
    i : Integer;
 begin
@@ -1205,7 +1205,7 @@ end;
 
 // All_RTL_JS
 //
-function All_RTL_JS : String;
+function All_RTL_JS : UnicodeString;
 var
    i : Integer;
    wobs : TWriteOnlyBlockStream;
@@ -1333,7 +1333,7 @@ end;
 procedure TJSMagicFuncExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 var
    e : TMagicFuncExpr;
-   name : String;
+   name : UnicodeString;
    i : Integer;
 begin
    e:=TMagicFuncExpr(expr);
@@ -1355,7 +1355,7 @@ end;
 //
 procedure TJSMagicFuncExpr.CodeGenFunctionName(codeGen : TdwsCodeGen; expr : TFuncExprBase; funcSym : TFuncSymbol);
 
-   function GetSignature(funcSym : TFuncSymbol) : String;
+   function GetSignature(funcSym : TFuncSymbol) : UnicodeString;
    var
       i : Integer;
    begin
@@ -1366,7 +1366,7 @@ procedure TJSMagicFuncExpr.CodeGenFunctionName(codeGen : TdwsCodeGen; expr : TFu
 
 var
    e : TMagicFuncExpr;
-   name : String;
+   name : UnicodeString;
 begin
    e:=TMagicFuncExpr(expr);
    if e.FuncSym.IsOverloaded then
@@ -1379,14 +1379,14 @@ end;
 
 // RegisterAlias
 //
-class procedure TJSMagicFuncExpr.RegisterAlias(const aliasName, canonicalName : String);
+class procedure TJSMagicFuncExpr.RegisterAlias(const aliasName, canonicalName : UnicodeString);
 begin
    vAliases.Values[aliasName]:=canonicalName;
 end;
 
 // CanonicalName
 //
-class function TJSMagicFuncExpr.CanonicalName(const aName : String) : String;
+class function TJSMagicFuncExpr.CanonicalName(const aName : UnicodeString) : UnicodeString;
 var
    i : Integer;
 begin
@@ -1407,9 +1407,9 @@ var
    e : TMagicFuncExpr;
 begin
    e:=TMagicFuncExpr(expr);
-   codeGen.WriteString('(');
+   codeGen.WriteString(UnicodeString('('));
    TJSSqrExpr.CodeGenSqr(codeGen, e.Args[0] as TTypedExpr);
-   codeGen.WriteString(')');
+   codeGen.WriteString(UnicodeString(')'));
 end;
 
 // ------------------
@@ -1427,22 +1427,22 @@ begin
 
    if e.Args.Count=1 then begin
 
-      codeGen.WriteString('(');
+      codeGen.WriteString(UnicodeString('('));
       codeGen.CompileNoWrap(e.Args[0] as TTypedExpr);
-      codeGen.WriteString(').toString()');
+      codeGen.WriteString(UnicodeString(').toString()'));
 
    end else if e.Args[1] is TConstIntExpr then begin
 
-      codeGen.WriteString('(');
+      codeGen.WriteString(UnicodeString('('));
       codeGen.CompileNoWrap(e.Args[0] as TTypedExpr);
 
       i:=e.Args[1].EvalAsInteger(nil);
       if i=99 then
-         codeGen.WriteString(').toString()')
+         codeGen.WriteString(UnicodeString(').toString()'))
       else begin
-         codeGen.WriteString(').toFixed(');
+         codeGen.WriteString(UnicodeString(').toFixed('));
          codeGen.WriteString(IntToStr(i));
-         codeGen.WriteString(')');
+         codeGen.WriteString(UnicodeString(')'));
       end;
 
    end else begin
@@ -1451,9 +1451,9 @@ begin
 
       codeGen.WriteString('FloatToStr$_Float_Integer_(');
       codeGen.CompileNoWrap(e.Args[0] as TTypedExpr);
-      codeGen.WriteString(',');
+      codeGen.WriteString(UnicodeString(','));
       codeGen.CompileNoWrap(e.Args[1] as TTypedExpr);
-      codeGen.WriteString(')');
+      codeGen.WriteString(UnicodeString(')'));
 
    end;
 end;
@@ -1486,7 +1486,7 @@ begin
             
             codeGen.WriteString('IntToHex2(');
             codeGen.CompileNoWrap(e.Args[0] as TTypedExpr);
-            codeGen.WriteString(')');
+            codeGen.WriteString(UnicodeString(')'));
             exit;
          end;
          
@@ -1498,9 +1498,9 @@ begin
 
    codeGen.WriteString('IntToHex(');
    codeGen.CompileNoWrap(e.Args[0] as TTypedExpr);
-   codeGen.WriteString(',');
+   codeGen.WriteString(UnicodeString(','));
    codeGen.CompileNoWrap(e.Args[1] as TTypedExpr);
-   codeGen.WriteString(')');
+   codeGen.WriteString(UnicodeString(')'));
 end;
 
 // ------------------
@@ -1521,9 +1521,9 @@ begin
       codeGen.Compile(a)
    else begin
       Assert(a is TTypedExpr);
-      codeGen.WriteString('(');
+      codeGen.WriteString(UnicodeString('('));
       codeGen.CompileNoWrap(TTypedExpr(a));
-      codeGen.WriteString(')');
+      codeGen.WriteString(UnicodeString(')'));
    end;
    codeGen.WriteString('.toString()');
 end;
@@ -1549,7 +1549,7 @@ begin
       case Length(c.Value) of
          0 : codeGen.WriteString('true');
          1 : begin
-            codeGen.WriteString('(');
+            codeGen.WriteString(UnicodeString('('));
             codeGen.Compile(e.Args[0]);
             if cgoObfuscate in codeGen.Options then begin
                // slightly faster but less readable, so activate only under obfuscation
@@ -1559,16 +1559,16 @@ begin
                codeGen.WriteString('.charAt(0)==');
                codeGen.WriteLiteralString(c.Value);
             end;
-            codeGen.WriteString(')');
+            codeGen.WriteString(UnicodeString(')'));
          end;
       else
-         codeGen.WriteString('(');
+         codeGen.WriteString(UnicodeString('('));
          codeGen.Compile(e.Args[0]);
          codeGen.WriteString('.substr(0,');
          codeGen.WriteString(IntToStr(Length(c.Value)));
          codeGen.WriteString(')==');
          codeGen.WriteLiteralString(c.Value);
-         codeGen.WriteString(')');
+         codeGen.WriteString(UnicodeString(')'));
       end;
 
    end else begin
@@ -1577,9 +1577,9 @@ begin
 
       codeGen.WriteString('StrBeginsWith(');
       codeGen.CompileNoWrap(e.Args[0] as TTypedExpr);
-      codeGen.WriteString(',');
+      codeGen.WriteString(UnicodeString(','));
       codeGen.CompileNoWrap(e.Args[1] as TTypedExpr);
-      codeGen.WriteString(')');
+      codeGen.WriteString(UnicodeString(')'));
 
    end;
 end;
@@ -1600,9 +1600,9 @@ begin
 
    needWrap:=(e.Args[1] is TConstStringExpr);
 
-   if needWrap then codeGen.WriteString('(');
+   if needWrap then codeGen.WriteString(UnicodeString('('));
    CodeGenNoWrap(codeGen, e);
-   if needWrap then codeGen.WriteString(')');
+   if needWrap then codeGen.WriteString(UnicodeString(')'));
 end;
 
 // CodeGenNoWrap
@@ -1621,22 +1621,22 @@ begin
    if element is TConstStringExpr then begin
 
       if TConstStringExpr(element).Value = '' then begin
-         codeGen.WriteString('0');
+         codeGen.WriteString(UnicodeString('0'));
       end else begin
          codeGen.CompileValue(e.Args[0] as TTypedExpr);
-         codeGen.WriteString('.indexOf(');
+         codeGen.WriteString(UnicodeString('.indexOf('));
          codeGen.WriteLiteralString(TConstStringExpr(element).Value);
          if offset is TConstIntExpr then begin
             if TConstIntExpr(offset).Value<>1 then begin
-               codeGen.WriteString(',');
+               codeGen.WriteString(UnicodeString(','));
                codeGen.WriteInteger(TConstIntExpr(offset).Value-1);
             end;
          end else begin
-            codeGen.WriteString(',');
+            codeGen.WriteString(UnicodeString(','));
             codeGen.CompileValue(offset);
-            codeGen.WriteString('-1');
+            codeGen.WriteString(UnicodeString('-1'));
          end;
-         codeGen.WriteString(')+1');
+         codeGen.WriteString(UnicodeString(')+1'));
       end;
 
    end else begin
@@ -1645,11 +1645,11 @@ begin
 
       codeGen.WriteString('StrFind(');
       codeGen.CompileNoWrap(e.Args[0] as TTypedExpr);
-      codeGen.WriteString(',');
+      codeGen.WriteString(UnicodeString(','));
       codeGen.CompileNoWrap(element);
-      codeGen.WriteString(',');
+      codeGen.WriteString(UnicodeString(','));
       codeGen.CompileNoWrap(offset);
-      codeGen.WriteString(')');
+      codeGen.WriteString(UnicodeString(')'));
 
    end;
 end;
@@ -1683,10 +1683,10 @@ begin
       and (TStringLengthExpr(lenArg).Expr.SameDataExpr(TTypedExpr(strArg))) then begin
       // to end of string
    end else begin
-      codeGen.WriteString(',');
+      codeGen.WriteString(UnicodeString(','));
       codeGen.Compile(lenArg);
    end;
-   codeGen.WriteString(')');
+   codeGen.WriteString(UnicodeString(')'));
 end;
 
 // ------------------
@@ -1697,7 +1697,7 @@ end;
 //
 procedure TJSStrMatchesFuncExpr.CodeGen(codeGen : TdwsCodeGen; expr : TExprBase);
 
-   function SimpleFilterToRegExp(const filter : String) : String;
+   function SimpleFilterToRegExp(const filter : UnicodeString) : UnicodeString;
    var
       i : Integer;
    begin
@@ -1734,7 +1734,7 @@ begin
          codeGen.WriteString(SimpleFilterToRegExp(c.Value));
          codeGen.WriteString('.test(');
          codeGen.Compile(e.Args[0]);
-         codeGen.WriteString(')');
+         codeGen.WriteString(UnicodeString(')'));
       end;
 
    end else begin
@@ -1743,9 +1743,9 @@ begin
 
       codeGen.WriteString('StrMatches(');
       codeGen.CompileNoWrap(e.Args[0] as TTypedExpr);
-      codeGen.WriteString(',');
+      codeGen.WriteString(UnicodeString(','));
       codeGen.CompileNoWrap(e.Args[1] as TTypedExpr);
-      codeGen.WriteString(')');
+      codeGen.WriteString(UnicodeString(')'));
 
    end;
 end;
@@ -1776,9 +1776,9 @@ begin
       FCodeGen.Localizer.LocalizeString(TConstStringExpr(expr).Value, s);
       codeGen.WriteLiteralString(s);
    end else begin
-      codeGen.WriteString('(');
+      codeGen.WriteString(UnicodeString('('));
       codeGen.CompileValue(expr as TTypedExpr);
-      codeGen.WriteString(')');
+      codeGen.WriteString(UnicodeString(')'));
    end;
 end;
 
@@ -1868,7 +1868,7 @@ end;
 
 // Create
 //
-constructor TFormatSplitInfos.Create(const fmtString : String);
+constructor TFormatSplitInfos.Create(const fmtString : UnicodeString);
 var
    i, n, p, pn, num, index : Integer;
    info : TFormatSplitInfo;
