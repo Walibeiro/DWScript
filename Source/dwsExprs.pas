@@ -3581,7 +3581,8 @@ end;
 //
 procedure TdwsMainProgram.OrphanObject(obj : TRefCountedObject);
 begin
-   FOrphanedObjects.Push(obj);
+   if obj <> nil then
+      FOrphanedObjects.Push(obj);
 end;
 
 // AddFinalExpr
