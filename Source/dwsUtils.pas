@@ -507,7 +507,7 @@ type
          FCapacity : Integer;
 
       protected
-         procedure Grow;
+         procedure Grow(capacityPreAdjusted : Boolean);
          function LinearFind(const item : TRefCountedObject; var index : Integer) : Boolean;
          function SameItem(const item1, item2 : TRefCountedObject) : Boolean;
          function GetItemHashCode(const item1 : TRefCountedObject) : Integer;
@@ -515,7 +515,6 @@ type
       public
          function Add(const anItem : TRefCountedObject) : Boolean; // true if added
          function Replace(const anItem : TRefCountedObject) : Boolean; // true if added
-         function Remove(const anItem : TRefCountedObject) : Boolean; // true if removed
          function Contains(const anItem : TRefCountedObject) : Boolean;
          function Match(var anItem : TRefCountedObject) : Boolean;
          procedure Enumerate(callBack : TSimpleHashFuncRefCountedObject);
@@ -4789,23 +4788,28 @@ end;
 // ------------------ TSimpleObjectHash ------------------
 // ------------------
 
+const
+   cSimpleHashMinCapacity = 32;
+
 // Grow
 //
-procedure TSimpleObjectHash.Grow;
+procedure TSimpleObjectHash.Grow(capacityPreAdjusted : Boolean);
 var
    i, j, n : Integer;
    oldBuckets : array of TSimpleHashBucketRefCountedObject;
 begin
-   if FCapacity=0 then
-      FCapacity:=32
-   else FCapacity:=FCapacity*2;
-   FGrowth:=(FCapacity*11) div 16;
+   if not capacityPreAdjusted then begin
+      if FCapacity = 0 then
+         FCapacity := cSimpleHashMinCapacity
+      else FCapacity := FCapacity*2;
+   end;
+   FGrowth := (FCapacity*11) div 16;
 
    SetLength(oldBuckets, Length(FBuckets));
    for i := 0 to Length(FBuckets) - 1 do
      oldBuckets[i] := FBuckets[i];
 
-   FBuckets:=nil;
+   FBuckets := nil;
    SetLength(FBuckets, FCapacity);
 
    n:=FCapacity-1;
@@ -4838,7 +4842,7 @@ var
    i : Integer;
    hashCode : Integer;
 begin
-   if FCount>=FGrowth then Grow;
+   if FCount>=FGrowth then Grow(False);
 
    hashCode:=GetItemHashCode(anItem);
    i:=(hashCode and (FCapacity-1));
@@ -4857,7 +4861,7 @@ var
    hashCode : Integer;
 begin
    Result:=False;
-   if FCount>=FGrowth then Grow;
+   if FCount>=FGrowth then Grow(False);
 
    hashCode:=GetItemHashCode(anItem);
    i:=(hashCode and (FCapacity-1));
@@ -4868,27 +4872,6 @@ begin
       FBuckets[i].Value:=anItem;
       Inc(FCount);
       Result:=True;
-   end;
-end;
-
-// Remove
-//
-function TSimpleObjectHash.Remove(const anItem : TRefCountedObject) : Boolean;
-var
-   i : Integer;
-   hashCode : Integer;
-begin
-   if FCount>=FGrowth then Grow;
-
-   hashCode:=GetItemHashCode(anItem);
-   i:=(hashCode and (FCapacity-1));
-   if LinearFind(anItem, i) then begin
-      FBuckets[i].HashCode:=0;
-      FBuckets[i].Value:=Default(TRefCountedObject);
-      Dec(FCount);
-      Result:=True;
-   end else begin
-      Result:=False;
    end;
 end;
 
@@ -4920,9 +4903,10 @@ end;
 //
 procedure TSimpleObjectHash.Enumerate(callBack : TSimpleHashFuncRefCountedObject);
 var
-   i : Integer;
+   i, initialCount : Integer;
 begin
-   if FCount=0 then Exit;
+   if FCount = 0 then Exit;
+   initialCount := FCount;
    for i:=0 to High(FBuckets) do begin
       if FBuckets[i].HashCode<>0 then begin
          if callBack(FBuckets[i].Value)=shaRemove then begin
@@ -4930,6 +4914,23 @@ begin
             FBuckets[i].Value:=Default(TRefCountedObject);
             Dec(FCount);
          end;
+      end;
+   end;
+   if FCount < initialCount then begin
+      case FCount of
+         0 : Clear;
+         1 .. cSimpleHashMinCapacity div 2 : begin
+            FCapacity := cSimpleHashMinCapacity;
+            Grow(True);
+         end;
+      else
+         // adjust capacity
+         i := 2 * FCount;
+         if i < cSimpleHashMinCapacity then
+            i  := cSimpleHashMinCapacity;
+         while FCapacity > i do
+            FCapacity := FCapacity div 2;
+         Grow(True);
       end;
    end;
 end;
